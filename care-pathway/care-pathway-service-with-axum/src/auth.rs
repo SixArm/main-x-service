@@ -510,13 +510,21 @@ fn decide(
 ///
 /// `care_setting` is the useful discriminator (a deployment may want
 /// `resource.care_setting` rules — e.g. an oncology-only reader).
-/// `sensitive_setting` flags the two settings that carry special-category
-/// treatment under UK Common Law Duty of Confidentiality and analogous
-/// regimes (`compliance-for-healthcare.md` §1) even though the pathway
-/// *template* itself names no patient: `mental_health` and `palliative`
-/// pathways are conventionally handled with tighter access than, say, an
-/// orthopaedics pathway, independent of whatever `care_setting` value a
-/// policy also keys on.
+/// `sensitive_setting` flags **special-category content**: material that
+/// carries tighter handling under the UK Common Law Duty of
+/// Confidentiality and analogous regimes (`compliance-for-healthcare.md`
+/// §1), even though the pathway *template* itself names no patient. It is
+/// `true` when the setting is `mental_health` or `palliative`, **or** when
+/// any condition code is a mental-health code
+/// ([`is_mental_health_code`]). The second test exists because content and
+/// setting diverge: a critical-care psychology pathway is `Inpatient`, yet
+/// every instance on it carries trauma, anxiety and depression scores
+/// (entity spec T-15a).
+///
+/// The attribute keeps its original name on purpose. Deployed policies
+/// already key on `resource.sensitive_setting`; widening what sets it
+/// makes those policies cover the new case on the next deploy, where a
+/// new attribute would leave every one of them silently not covering it.
 #[must_use]
 pub fn care_pathway_resource_attrs(
     pathway: &care_pathway_matcher::CarePathway,
@@ -534,9 +542,38 @@ pub fn care_pathway_resource_attrs(
             care_pathway_matcher::CareSetting::MentalHealth
                 | care_pathway_matcher::CareSetting::Palliative
         )
-    );
+    ) || pathway.condition_codes.iter().any(is_mental_health_code);
     attrs.insert("sensitive_setting".to_string(), vec![sensitive.to_string()]);
     attrs
+}
+
+/// Whether a condition code names a mental, behavioural or
+/// neurodevelopmental disorder: ICD-10 chapter V (`F00`–`F99`) or ICD-11
+/// chapter 06, whose stem codes all begin with `6` (in ICD-11 the first
+/// character names the chapter).
+///
+/// SNOMED CT and custom codes are never classed here. Placing a SNOMED
+/// concept under the mental-disorder hierarchy needs a terminology server,
+/// and guessing from the digits would be wrong both ways (entity spec
+/// §12.5). A deployment that codes mental-health pathways only in SNOMED
+/// gets the flag from `care_setting`, or not at all.
+///
+/// The code is trimmed and upper-cased first. Validation already rejects
+/// non-canonical forms on write, but a row stored before that check must
+/// err towards sensitive rather than open.
+#[must_use]
+pub fn is_mental_health_code(code: &care_pathway_matcher::ConditionCode) -> bool {
+    let first = code
+        .code
+        .trim()
+        .chars()
+        .next()
+        .map(|c| c.to_ascii_uppercase());
+    match code.system {
+        care_pathway_matcher::CodeSystem::Icd10 => first == Some('F'),
+        care_pathway_matcher::CodeSystem::Icd11 => first == Some('6'),
+        _ => false,
+    }
 }
 
 /// Authorize an action against **one specific record**, returning the
@@ -1482,6 +1519,76 @@ mod tests {
             care_pathway_resource_attrs(&pathway).get("sensitive_setting"),
             Some(&vec!["true".to_string()])
         );
+    }
+
+    /// Content makes a pathway sensitive whatever its setting (T-15a): an
+    /// `Inpatient` critical-care psychology pathway coded ICD-10 `F43.1`
+    /// is flagged, and an ICD-11 chapter 06 code does the same.
+    #[test]
+    fn resource_attrs_flag_mental_health_codes_in_any_setting() {
+        use care_pathway_matcher::{CodeSystem, ConditionCode};
+        let mut pathway =
+            care_pathway_matcher::CarePathway::new("ICU Survival to Recovery Pathway");
+        pathway.care_setting = Some(care_pathway_matcher::CareSetting::Inpatient);
+        pathway.condition_codes = vec![
+            ConditionCode {
+                system: CodeSystem::Icd10,
+                code: "J96.0".to_string(),
+            },
+            ConditionCode {
+                system: CodeSystem::Icd10,
+                code: "F43.1".to_string(),
+            },
+        ];
+        assert_eq!(
+            care_pathway_resource_attrs(&pathway).get("sensitive_setting"),
+            Some(&vec!["true".to_string()])
+        );
+
+        pathway.condition_codes = vec![ConditionCode {
+            system: CodeSystem::Icd11,
+            code: "6B40".to_string(),
+        }];
+        assert_eq!(
+            care_pathway_resource_attrs(&pathway).get("sensitive_setting"),
+            Some(&vec!["true".to_string()])
+        );
+    }
+
+    /// The classification is by chapter and nothing wider: physical codes
+    /// that merely look nearby stay ordinary, SNOMED and custom codes are
+    /// never guessed at, and a non-canonical stored form errs towards
+    /// sensitive.
+    #[test]
+    fn mental_health_code_classification_is_by_chapter() {
+        use care_pathway_matcher::{CodeSystem, ConditionCode};
+        let code = |system: CodeSystem, value: &str| ConditionCode {
+            system,
+            code: value.to_string(),
+        };
+        for c in ["F00", "F32.9", "F43.1", "F99"] {
+            assert!(is_mental_health_code(&code(CodeSystem::Icd10, c)), "{c}");
+        }
+        for c in ["I63.9", "G30.0", "J96.0", "E11"] {
+            assert!(!is_mental_health_code(&code(CodeSystem::Icd10, c)), "{c}");
+        }
+        for c in ["6A70", "6B40", "6D80"] {
+            assert!(is_mental_health_code(&code(CodeSystem::Icd11, c)), "{c}");
+        }
+        for c in ["1A00", "8B20.0", "BA00"] {
+            assert!(!is_mental_health_code(&code(CodeSystem::Icd11, c)), "{c}");
+        }
+        // SNOMED 192080009 (chronic depression) is a mental disorder, but
+        // without a terminology server it is not classed: a stated limit.
+        assert!(!is_mental_health_code(&code(
+            CodeSystem::Snomed,
+            "192080009"
+        )));
+        assert!(!is_mental_health_code(&code(
+            CodeSystem::Custom("local".to_string()),
+            "F43.1"
+        )));
+        assert!(is_mental_health_code(&code(CodeSystem::Icd10, " f43.1")));
     }
 
     /// No `care_setting` at all ⇒ no `care_setting` attribute (nothing to

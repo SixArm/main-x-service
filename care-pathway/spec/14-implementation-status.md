@@ -59,5 +59,5 @@ See §13 T-1 for the full reasoning.
 | No localization of the operator UI | (roadmap §15; no task yet) |
 | `patient-flow` exposes no timeline endpoint, so a stay leg of a stitched journey reports `not_configured` — the contract it must satisfy is in `src/journey.rs` | patient-flow adoption |
 | The instance and insight endpoints are still absent from `openapi.json` (the TBA surface is documented; they are not) | time-based-analysis §17 |
-| `sensitive_setting` is derived from `care_setting` alone, so a pathway in a non-mental-health setting with psychological content (e.g. critical-care psychology, ICD-10 `F43.1`) is not flagged, and its instances' mental-health scores are not covered by policies keyed on it | T-15a |
+| `sensitive_setting` now follows ICD mental-health condition codes as well as setting (2026-11-13), but mental-health **instance measures** are not yet masked on their own, and SNOMED-only coding is not recognised (§12.5) | T-15a (after T-15b) |
 | `instance_measures` are free-named, with no instrument, valid range, or screen threshold, so a screening rate cannot be computed or checked | T-15b |

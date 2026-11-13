@@ -676,6 +676,14 @@ prefix.
   deployment MUST turn it on, alongside `CARE_PATHWAY_REQUIRE_AUTH`
   (§12.3, and the activation gate in
   [`agents/share/security.md`](../../agents/share/security.md) §4).
+- **Content-derived sensitivity covers ICD only.** A pathway is flagged
+  `sensitive_setting` by an ICD-10 chapter V or ICD-11 chapter 06 code
+  (§13 T-15a), but a SNOMED CT mental-disorder concept is not
+  recognised: placing it in the hierarchy needs a terminology server,
+  and guessing from digits would be wrong both ways. A deployment that
+  codes mental-health pathways only in SNOMED must set the
+  `mental_health` care setting, or carry an ICD code beside the SNOMED
+  one.
 - **EHDS data permits and secure processing environments** are not
   built — they are an operating-organisation and infrastructure
   concern. The service contributes the purpose-of-use marking and the

@@ -1521,6 +1521,29 @@ the evidence bundle.
   including a record-level-decision proof that a non-sensitive-setting
   read is *not* masked by the same policy) + 1 enforcement + 1
   outbox-audit green vs Postgres 18; 246 lib tests; fmt + clippy clean.
+- [x] **2026-11-13 — Sensitivity follows content, not only setting
+  (entity T-15a, condition-code half).** `care_pathway_resource_attrs`
+  now sets `resource.sensitive_setting=true` when any condition code is
+  ICD-10 chapter V (`F00`–`F99`) or ICD-11 chapter 06 (stem codes
+  beginning `6`), as well as for a `mental_health` or `palliative`
+  setting (`auth::is_mental_health_code`). A critical-care psychology
+  pathway is `Inpatient`, yet its instances carry trauma, anxiety and
+  depression scores; before this, a policy keyed on `sensitive_setting`
+  did not cover it. The attribute **keeps its name** on purpose: widening
+  it makes every deployed policy cover the new case, where a parallel
+  attribute would leave them all silently not covering it (fail-open).
+  SNOMED CT and custom codes are not classed, since that needs a
+  terminology server (entity §12.5). Codes are trimmed and upper-cased
+  before the check, so a row stored before validation errs towards
+  sensitive. **Not in this change:** masking mental-health
+  *instance measures*, which needs entity T-15b's instrument catalogue
+  first. *Verified:* two unit tests (classification by chapter;
+  content flags an `Inpatient` pathway) and a DB-gated
+  `tests/masking.rs` case where the same `dept=partner` policy that
+  leaves the hip pathway unmasked now masks an `Inpatient` pathway coded
+  `F43.1`. That suite's hip fixture had inherited an `F32` code from the
+  mental-health fixture, which would now have made it sensitive; it
+  takes `M16.1` instead.
 - [x] **2026-11-07 — Cursor pagination on list and search.** `GET
   /api/care-pathways` and `GET /api/care-pathways/search` page by
   `?limit=` and a signed `?cursor=` with `Link: rel="next"`

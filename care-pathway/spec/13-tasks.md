@@ -1542,6 +1542,9 @@ manual check confirms it. Split tasks too big for one PR
   demand. Each sub-task is one three-part PR (spec + code + test).
 
   - [ ] **T-15a — Sensitivity follows content, not only setting.**
+    *(Condition-code half done 2026-11-13: `auth::is_mental_health_code`
+    plus `tests/masking.rs`; see the service spec §13 entry of that date.
+    The instance-measure masking half waits on T-15b.)*
     `care_pathway_resource_attrs` sets `sensitive_setting=true` for a
     `mental_health` or `palliative` `care_setting` **or** when any
     `condition_codes` entry is ICD-10 chapter V (`F00`–`F99`) or

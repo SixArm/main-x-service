@@ -9,6 +9,17 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Changed — sensitivity follows content (entity T-15a)
+
+- `resource.sensitive_setting` is now `true` for a pathway with any
+  ICD-10 chapter V (`F…`) or ICD-11 chapter 06 (`6…`) condition code,
+  whatever its `care_setting`, as well as for mental-health and
+  palliative settings. A policy keyed on it therefore now covers, for
+  example, an `Inpatient` critical-care psychology pathway. **Check a
+  deployed policy** that grants something only to non-sensitive
+  pathways: pathways with those codes now fall on the other side of it.
+  SNOMED CT codes are not classed.
+
 ### Fixed — record-level reads on FHIR (CP-FH1)
 
 - With `CARE_PATHWAY_REQUIRE_AUTH` on, `GET /fhir/PlanDefinition/{id}`

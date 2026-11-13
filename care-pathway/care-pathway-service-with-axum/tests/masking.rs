@@ -258,6 +258,9 @@ async fn non_sensitive_settings_are_not_masked_by_the_same_policy() {
         let mut ortho = stroke_pathway();
         ortho["name"] = json!("Elective Hip Replacement Pathway");
         ortho["care_setting"] = json!("Inpatient");
+        // An orthopaedic code: the fixture's own `F32` would now make
+        // the pathway sensitive by content (T-15a) whatever its setting.
+        ortho["condition_codes"] = json!([{"system": "Icd10", "code": "M16.1"}]);
         let created = request
             .post("/api/care-pathways")
             .add_header(wk, wv)
@@ -282,6 +285,77 @@ async fn non_sensitive_settings_are_not_masked_by_the_same_policy() {
         assert_eq!(
             body["provider_id"], "trust-9",
             "no matching rule ⇒ no obligation ⇒ unmasked: {body}"
+        );
+    })
+    .await;
+
+    unsafe {
+        std::env::remove_var("CARE_PATHWAY_REQUIRE_AUTH");
+        std::env::remove_var("CARE_PATHWAY_ABAC_POLICY");
+        std::env::remove_var("CARE_PATHWAY_PASETO_KEYS");
+    }
+}
+
+/// Sensitivity follows content as well as setting (entity spec T-15a). An
+/// `Inpatient` critical-care psychology pathway coded ICD-10 `F43.1` is
+/// masked for `dept=partner` by the same policy that leaves the hip
+/// pathway above alone. Before T-15a it was read in full.
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test --test masking -- --ignored`"]
+async fn mental_health_codes_make_an_inpatient_pathway_sensitive() {
+    let (keys, kid) = keys_and_kid();
+    let policy = json!({
+        "rules": [
+            { "effect": "allow", "actions": ["read"],
+              "when": { "dept": ["partner"], "resource.sensitive_setting": ["true"] },
+              "obligations": ["mask"] },
+            { "effect": "allow", "actions": ["write"], "when": { "access": ["write"] } }
+        ]
+    });
+    unsafe {
+        std::env::set_var("CARE_PATHWAY_REQUIRE_AUTH", "1");
+        std::env::set_var("CARE_PATHWAY_PASETO_KEYS", keys.to_string());
+        std::env::set_var("CARE_PATHWAY_ABAC_POLICY", policy.to_string());
+        std::env::set_var(
+            "CARE_PATHWAY_SEARCH_INDEX_PATH",
+            std::env::temp_dir().join(format!(
+                "care-pathway-masking-index-content-{}",
+                std::process::id()
+            )),
+        );
+        std::env::set_var("CARE_PATHWAY_SEARCH_BOOT_REINDEX", "0");
+    }
+
+    request::<App, _, _>(|request, _ctx| async move {
+        let (wk, wv) = auth_header(&mint(&kid, &[("access", &["write"])]));
+        let mut icu = stroke_pathway();
+        icu["name"] = json!("ICU Survival to Recovery Psychology Pathway");
+        icu["care_setting"] = json!("Inpatient");
+        icu["pathway_code"] = json!("ICU-PSY-01");
+        icu["identifiers"] = json!([]);
+        icu["condition_codes"] = json!([
+            {"system": "Icd10", "code": "J96.0"},
+            {"system": "Icd10", "code": "F43.1"}
+        ]);
+        let created = request
+            .post("/api/care-pathways")
+            .add_header(wk, wv)
+            .json(&icu)
+            .await;
+        assert_eq!(created.status_code(), 200, "{}", created.text());
+        let pid = created.json::<Value>()["pid"].as_str().unwrap().to_string();
+
+        let (m_k, m_v) = auth_header(&mint(&kid, &[("dept", &["partner"])]));
+        let response = request
+            .get(&format!("/api/care-pathways/{pid}"))
+            .add_header(m_k, m_v)
+            .await;
+        assert_eq!(response.status_code(), 200);
+        let body: Value = serde_json::from_str(&response.text()).unwrap();
+        assert_ne!(
+            body["provider_id"], "trust-9",
+            "an F-chapter code makes the pathway sensitive, so the mask obligation applies: {body}"
         );
     })
     .await;
