@@ -913,9 +913,11 @@ fn instance_record_and_view_paths() -> Value {
                 "summary": "Record a clinical / PROM measure",
                 "parameters": [instance_pid.clone()],
                 "requestBody": { "required": true, "content": { "application/json": { "schema": {
-                    "type": "object", "required": ["name"],
+                    "type": "object",
+                    "description": "`name` is required unless `instrument` is given, in which case it defaults to the instrument's name.",
                     "properties": {
                         "name": { "type": "string" },
+                        "instrument": { "type": "string", "nullable": true, "description": "A catalogued instrument id (GET /api/instances/instruments). The measure is then that instrument's total score: value_numeric is required and range-checked." },
                         "value_numeric": { "type": "number", "nullable": true },
                         "value_text": { "type": "string", "nullable": true },
                         "unit": { "type": "string", "nullable": true },
@@ -923,10 +925,17 @@ fn instance_record_and_view_paths() -> Value {
                     }
                 } } } },
                 "responses": {
-                    "200": { "description": "The recorded measure" },
+                    "200": { "description": "The recorded measure, with a derived screen_positive (null where no instrument, threshold or score exists)" },
                     "404": { "description": "Unknown instance" },
-                    "422": { "description": "Blank name, or neither value_numeric nor value_text given" }
+                    "422": { "description": "Blank name (with no instrument), neither value_numeric nor value_text given, an unknown instrument, or a score outside the instrument's range" }
                 }
+            }
+        },
+        "/api/instances/instruments": {
+            "get": {
+                "tags": ["instances"],
+                "summary": "The instrument catalogue: ranges, screen thresholds, citations, licence status",
+                "responses": { "200": { "description": "Reference data. A screen is not a diagnosis; check each licence_note before use." } }
             }
         },
         "/api/instances/{pid}/steps/{step}/complete": {
@@ -1180,6 +1189,7 @@ mod tests {
             "/api/instances/{pid}/team",
             "/api/instances/{pid}/events",
             "/api/instances/{pid}/measures",
+            "/api/instances/instruments",
             "/api/instances/{pid}/steps/{step}/complete",
             "/api/instances/caseload",
             "/api/instances/overdue-reviews",

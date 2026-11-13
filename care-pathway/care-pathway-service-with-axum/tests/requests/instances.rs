@@ -243,3 +243,110 @@ async fn instance_layer_round_trip() {
     })
     .await;
 }
+
+/// Catalogued instruments (spec §13 T-15b): a measure naming one is a
+/// range-checked total score with a derived `screen_positive`; a
+/// free-named measure round-trips exactly as before; and the catalogue is
+/// served as reference data.
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
+async fn instrument_measures_are_range_checked_and_screened() {
+    super::isolate_search_index();
+    request::<App, _, _>(|request, _ctx| async move {
+        let template: Value = request
+            .post("/api/care-pathways")
+            .json(&json!({ "name": "Critical care recovery", "care_setting": "Inpatient" }))
+            .await
+            .json();
+        let pathway = template["pid"].as_str().unwrap().to_string();
+        let instance: Value = request
+            .post(&format!("/api/care-pathways/{pathway}/instances"))
+            .json(&json!({ "subject_ref": format!("person:{}", uuid::Uuid::new_v4()) }))
+            .await
+            .json();
+        let i_pid = instance["pid"].as_str().unwrap().to_string();
+        let url = format!("/api/instances/{i_pid}/measures");
+
+        // IPAT at the threshold is a positive screen; the name defaults.
+        let at: Value = request
+            .post(&url)
+            .json(&json!({ "instrument": "ipat", "value_numeric": 7 }))
+            .await
+            .json();
+        assert_eq!(at["instrument"], "ipat", "{at}");
+        assert_eq!(at["screen_positive"], true);
+        assert!(at["name"].as_str().unwrap().contains("IPAT"), "{at}");
+
+        // One below it is not.
+        let below: Value = request
+            .post(&url)
+            .json(&json!({ "instrument": "ipat", "value_numeric": 6 }))
+            .await
+            .json();
+        assert_eq!(below["screen_positive"], false);
+
+        // An instrument with no defended threshold derives nothing.
+        let ies: Value = request
+            .post(&url)
+            .json(&json!({ "instrument": "ies_r", "value_numeric": 80 }))
+            .await
+            .json();
+        assert!(ies["screen_positive"].is_null(), "{ies}");
+
+        // Refusals: out of range, no score, unknown instrument.
+        for bad in [
+            json!({ "instrument": "ipat", "value_numeric": 21 }),
+            json!({ "instrument": "ipat", "value_numeric": -1 }),
+            json!({ "instrument": "ipat", "value_text": "seven" }),
+            json!({ "instrument": "no_such", "value_numeric": 1 }),
+        ] {
+            assert_eq!(
+                request.post(&url).json(&bad).await.status_code(),
+                422,
+                "{bad}"
+            );
+        }
+
+        // A free-named measure is untouched: no instrument, no screen.
+        let free: Value = request
+            .post(&url)
+            .json(&json!({ "name": "nihss", "value_numeric": 4 }))
+            .await
+            .json();
+        assert!(free["instrument"].is_null());
+        assert!(free["screen_positive"].is_null());
+        assert_eq!(
+            request
+                .post(&url)
+                .json(&json!({ "name": " ", "value_numeric": 1 }))
+                .await
+                .status_code(),
+            422,
+            "a blank name with no instrument is still refused"
+        );
+
+        // The detail read carries the derived flag for each stored row.
+        let detail: Value = request.get(&format!("/api/instances/{i_pid}")).await.json();
+        let measures = detail["measures"].as_array().unwrap();
+        assert_eq!(measures.len(), 4);
+        let positives = measures
+            .iter()
+            .filter(|m| m["screen_positive"] == true)
+            .count();
+        assert_eq!(
+            positives, 1,
+            "only the IPAT 7 is a positive screen: {measures:?}"
+        );
+
+        // The catalogue is reference data, with a licence note on each.
+        let catalogue: Value = request.get("/api/instances/instruments").await.json();
+        let list = catalogue["instruments"].as_array().unwrap();
+        assert!(list.iter().any(|i| i["id"] == "ipat"));
+        assert!(
+            list.iter()
+                .all(|i| !i["licence_note"].as_str().unwrap_or("").is_empty())
+        );
+    })
+    .await;
+}

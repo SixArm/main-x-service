@@ -13,6 +13,7 @@ use uuid::Uuid;
 
 use crate::auth::MaybeAuthUser;
 use crate::instances as rules;
+use crate::instruments;
 use crate::models::audit_logs::Model as Audit;
 use crate::models::care_pathways::Model as PathwayModel;
 use crate::models::instance_measures::NewMeasure;
@@ -181,6 +182,7 @@ async fn get_instance(State(ctx): State<AppContext>, Path(raw): Path<String>) ->
     let events = instance_events::Model::for_instance_newest_first(&ctx.db, instance.pid).await?;
     let measures =
         instance_measures::Model::for_instance_newest_first(&ctx.db, instance.pid).await?;
+    let measures: Vec<MeasureView<'_>> = measures.iter().map(MeasureView::of).collect();
     format::json(serde_json::json!({
         "instance": instance, "steps": steps, "team": team,
         "events": events, "measures": measures,
@@ -782,6 +784,8 @@ async fn care_team_load(State(ctx): State<AppContext>) -> Result<Response> {
 /// `POST /api/instances/{pid}/measures` body.
 #[derive(Debug, serde::Deserialize)]
 struct MeasurePayload {
+    /// Required unless `instrument` is given, which supplies a default.
+    #[serde(default)]
     name: String,
     #[serde(default)]
     value_numeric: Option<f64>,
@@ -791,10 +795,39 @@ struct MeasurePayload {
     unit: Option<String>,
     #[serde(default)]
     recorded_on: Option<chrono::NaiveDate>,
+    /// A catalogued instrument ([`instruments`]). When set, the measure
+    /// is that instrument's total score: `value_numeric` is required and
+    /// range-checked, and `name` defaults to the instrument's name.
+    #[serde(default)]
+    instrument: Option<String>,
+}
+
+/// A recorded measure plus what is derived from it on read. The derived
+/// `screen_positive` is never stored, so a corrected score corrects it.
+#[derive(Debug, serde::Serialize)]
+struct MeasureView<'a> {
+    #[serde(flatten)]
+    measure: &'a instance_measures::Model,
+    /// A positive screen on the named instrument's threshold. `null` when
+    /// no instrument, no threshold, or no score exists to derive from.
+    screen_positive: Option<bool>,
+}
+
+impl<'a> MeasureView<'a> {
+    fn of(measure: &'a instance_measures::Model) -> Self {
+        Self {
+            screen_positive: instruments::screen_positive(
+                measure.instrument.as_deref(),
+                measure.value_numeric,
+            ),
+            measure,
+        }
+    }
 }
 
 /// `POST /api/instances/{pid}/measures` — record a clinical / PROM
-/// measure (a numeric or text value; at least one required).
+/// measure (a numeric or text value; at least one required). A measure
+/// naming a catalogued `instrument` must be an in-range numeric score.
 #[debug_handler]
 async fn record_measure(
     State(ctx): State<AppContext>,
@@ -802,9 +835,17 @@ async fn record_measure(
     Path(raw): Path<String>,
     Json(payload): Json<MeasurePayload>,
 ) -> Result<Response> {
-    if payload.name.trim().is_empty() {
-        return Err(refuse("name is required"));
-    }
+    let instrument = match payload.instrument.as_deref() {
+        Some(id) => {
+            Some(instruments::check_score(id, payload.value_numeric).map_err(|e| refuse(&e))?)
+        }
+        None => None,
+    };
+    let name = match (payload.name.trim(), instrument) {
+        ("", Some(i)) => i.name,
+        ("", None) => return Err(refuse("name is required")),
+        (given, _) => given,
+    };
     if payload.value_numeric.is_none() && payload.value_text.as_deref().is_none_or(str::is_empty) {
         return Err(refuse("a value_numeric or value_text is required"));
     }
@@ -813,13 +854,14 @@ async fn record_measure(
         &ctx.db,
         &NewMeasure {
             instance_pid: instance.pid,
-            name: &payload.name,
+            name,
             value_numeric: payload.value_numeric,
             value_text: payload.value_text.as_deref(),
             unit: payload.unit.as_deref(),
             recorded_on: payload
                 .recorded_on
                 .unwrap_or_else(|| chrono::Utc::now().date_naive()),
+            instrument: instrument.map(|i| i.id),
         },
     )
     .await?;
@@ -831,7 +873,21 @@ async fn record_measure(
         None,
     )
     .await?;
-    format::json(row)
+    format::json(MeasureView::of(&row))
+}
+
+/// `GET /api/instances/instruments` — the instrument catalogue: ranges,
+/// screen thresholds, citations and licence status. Reference data, not
+/// an assertion that any pathway uses any of them.
+#[debug_handler]
+async fn instrument_catalogue() -> Result<Response> {
+    format::json(serde_json::json!({
+        "note": "A screen is not a diagnosis: screen_at is the score at or above \
+                 which a measure is reported screen_positive. A null screen_at \
+                 means no threshold is defended. Check each licence_note before \
+                 relying on an instrument.",
+        "instruments": instruments::CATALOGUE,
+    }))
 }
 
 /// `GET /api/care-pathways/{pathway}/outcomes` — outcome analytics for
@@ -918,6 +974,7 @@ pub fn routes() -> Routes {
         .add("/overdue-reviews", get(overdue_reviews))
         .add("/stalled", get(stalled))
         .add("/care-team-load", get(care_team_load))
+        .add("/instruments", get(instrument_catalogue))
         .add("/{pid}", get(get_instance))
         .add("/{pid}/status", post(set_status))
         .add("/{pid}/review", post(record_review))

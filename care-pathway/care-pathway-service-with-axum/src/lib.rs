@@ -68,6 +68,9 @@ pub mod frequencies;
 pub mod initializers;
 /// Pure rules for the care-pathway instance layer.
 pub mod instances;
+/// The instrument catalogue for `instance_measures`: ranges, screen
+/// thresholds, licence status.
+pub mod instruments;
 /// Stitched journeys: following a `continues_as` chain across service
 /// boundaries so time-based analysis measures the whole journey.
 pub mod journey;

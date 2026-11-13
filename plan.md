@@ -397,11 +397,13 @@ front-end sweep. LCI-4 (attestation) needs the trust decision in
 `spec/local-ci` §4.3 first. The self-hosted runner (LCI-7) is last and
 needs a machine and an owner.
 
-**Phase 14 — Trauma-informed recovery pathways (Theme H).** TI-2 and
-care-pathway T-15a go first and together, because they close a
-confidentiality gap. The rest follows T-15b, which every measurement
-task depends on. TI-3 is independent and also unblocks stitched
-journeys generally.
+**Phase 14 — Trauma-informed recovery pathways (Theme H).** The order
+changed on 2026-11-13, when closing T-15a showed the instance layer takes
+no record-level decision at all. T-15a and T-15b are done; **T-15h (a
+decision on every instance read and write) goes next, ahead of the
+screening views**, because T-15c and T-15d aggregate exactly the data it
+protects. TI-2 follows T-15h. TI-3 is independent and also unblocks
+stitched journeys generally.
 
 ## 4. Working agreements (for the executing session)
 

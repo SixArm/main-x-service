@@ -8844,10 +8844,12 @@ Kept as they were by worker's SQ-1, then fixed (crate spec §13).
 > T-15, which is the single source of truth for them. Only the
 > consequences that cross a subproject boundary are listed here.
 
-- [ ] **TI-1 (L)** care-pathway **T-15a … T-15g**, the entity-level
-  queue. It is tracked there, not here. Order: T-15a (a live
-  confidentiality gap), then T-15b, then T-15c / T-15d, then T-15e /
-  T-15f; T-15g only on a deployment's request.
+- [ ] **TI-1 (L)** care-pathway **T-15a … T-15h**, the entity-level
+  queue. It is tracked there, not here. **Progress 2026-11-13:** T-15a
+  (condition-code half) and T-15b are done. T-15h is next, ahead of
+  T-15c / T-15d, because those add aggregate views over instance data
+  that currently has no record-level protection. Then T-15e / T-15f;
+  T-15g only on a deployment's request.
 - [ ] **TI-2 (S)** Write the rule T-15a settles into
   [`agents/share/privacy.md`](agents/share/privacy.md):
   **special-category status follows content, not only setting.** A
@@ -8856,7 +8858,12 @@ Kept as they were by worker's SQ-1, then fixed (crate spec §13).
   attribute rather than add a parallel one, so deployed policies cover
   the new case (fail-closed). case and patient-flow should check
   whether they derive sensitivity from a setting-like field alone.
-  Depends: care-pathway T-15a.
+  **Add a second clause from T-15h:** a sensitivity flag protects only
+  what takes a record-level decision against it, so the rule must say
+  the *operational* layer (enrolments, stays, segments, measures) takes
+  that decision too. care-pathway's did not. patient-flow and case should
+  be checked for the same gap, not only for the same derivation.
+  Depends: care-pathway T-15a, T-15h.
 - [ ] **TI-3 (M)** patient-flow: serve the stay timeline that
   `src/journey.rs` already expects (care-pathway §14.2 gap). Beyond
   completing stitched journeys, it is the only source of the

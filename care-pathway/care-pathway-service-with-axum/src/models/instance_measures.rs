@@ -32,6 +32,9 @@ pub struct Model {
     pub unit: Option<String>,
     /// The day it was recorded.
     pub recorded_on: NaiveDate,
+    /// The catalogued instrument this is a score on
+    /// ([`crate::instruments`]), if any.
+    pub instrument: Option<String>,
 }
 
 /// The columns a new measure is written with.
@@ -49,6 +52,8 @@ pub struct NewMeasure<'a> {
     pub unit: Option<&'a str>,
     /// The day it was recorded.
     pub recorded_on: NaiveDate,
+    /// The catalogued instrument this is a score on, if any.
+    pub instrument: Option<&'a str>,
 }
 
 impl Model {
@@ -61,11 +66,12 @@ impl Model {
         let row = sqlx::query_as!(
             Self,
             r#"INSERT INTO instance_measures
-                   (pid, instance_pid, name, value_numeric, value_text, unit, recorded_on)
-               VALUES ($1, $2, $3, $4, $5, $6, $7)
+                   (pid, instance_pid, name, value_numeric, value_text, unit, recorded_on,
+                    instrument)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
                RETURNING created_at AS "created_at: _", updated_at AS "updated_at: _",
                          id, pid, instance_pid, name, value_numeric, value_text, unit,
-                         recorded_on"#,
+                         recorded_on, instrument"#,
             Uuid::new_v4(),
             new.instance_pid,
             new.name,
@@ -73,6 +79,7 @@ impl Model {
             new.value_text,
             new.unit,
             new.recorded_on,
+            new.instrument,
         )
         .fetch_one(db)
         .await?;
@@ -92,7 +99,7 @@ impl Model {
             Self,
             r#"SELECT created_at AS "created_at: _", updated_at AS "updated_at: _",
                       id, pid, instance_pid, name, value_numeric, value_text, unit,
-                      recorded_on
+                      recorded_on, instrument
                FROM instance_measures
                WHERE instance_pid = $1
                ORDER BY recorded_on DESC"#,
@@ -113,7 +120,7 @@ impl Model {
             Self,
             r#"SELECT created_at AS "created_at: _", updated_at AS "updated_at: _",
                       id, pid, instance_pid, name, value_numeric, value_text, unit,
-                      recorded_on
+                      recorded_on, instrument
                FROM instance_measures
                WHERE instance_pid = ANY($1)"#,
             instance_pids,

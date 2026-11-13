@@ -1544,7 +1544,14 @@ manual check confirms it. Split tasks too big for one PR
   - [ ] **T-15a — Sensitivity follows content, not only setting.**
     *(Condition-code half done 2026-11-13: `auth::is_mental_health_code`
     plus `tests/masking.rs`; see the service spec §13 entry of that date.
-    The instance-measure masking half waits on T-15b.)*
+    **Correction, same day:** the other half is not "waits on T-15b". The
+    instance handlers (`controllers/instances.rs`, `controllers/tba.rs`)
+    take **no record-level decision at all**: only the blanket guard
+    stands in front of an enrolment, its steps, its measures and its
+    segments. So widening `sensitive_setting` protects the template read,
+    links and exports, and **does not** reach the patient-level data this
+    task was meant to protect. That is [T-15h](#t-15h); the bullet below
+    cannot be met without it.)*
     `care_pathway_resource_attrs` sets `sensitive_setting=true` for a
     `mental_health` or `palliative` `care_setting` **or** when any
     `condition_codes` entry is ICD-10 chapter V (`F00`–`F99`) or
@@ -1563,7 +1570,8 @@ manual check confirms it. Split tasks too big for one PR
     - Instance measures from a T-15b instrument whose category is
       `mental_health` are masked under a `mask` obligation on every
       read path (instance detail, `outcomes`, `event_log` /
-      `journey_features`, FHIR), per security invariant 5.
+      `journey_features`, FHIR), per security invariant 5. **Built in
+      T-15h**, not here.
     - **Acceptance:** an `Inpatient` pathway coded ICD-10 `F43.1`
       reports `sensitive_setting=true`, and a policy denying it to
       `dept=outsider` denies; an orthopaedic `Inpatient` pathway
@@ -1571,7 +1579,37 @@ manual check confirms it. Split tasks too big for one PR
       unchanged; the coarse no-record guard path is unaffected
       (SEC-V2).
 
-  - [ ] **T-15b — Instrument catalogue for `instance_measures`.** An
+  - [x] **T-15b — Instrument catalogue for `instance_measures`.**
+    **Done 2026-11-13** (`src/instruments.rs`, migration
+    `…00000018_measure_instrument`, `GET /api/instances/instruments`).
+    Scope decisions, each from checking rather than assuming:
+    - **Seeded: IPAT, PCL-5, PHQ-9, GAD-7** (range + threshold),
+      **IES-R** (range, *no* threshold: the quoted 33 is from one veteran
+      sample and is not author-endorsed), and **HADS-A / HADS-D**
+      (`restricted`, range only). CAM-ICU is **not** seeded: it is a
+      binary, not a score, and needs a categorical kind this catalogue
+      does not have. EQ-5D is not seeded: its index values go negative
+      and need a country value set.
+    - **No licence is marked `open`.** Every "free to use" claim found was
+      secondary, and a primary PHQ-9 document pointed users to the holder
+      for permission. Statuses are `unconfirmed` or `restricted`, and the
+      catalogue test refuses an entry without a licence note.
+    - **No LOINC code is seeded**, and a test refuses one without a
+      checked source, because an exact code from memory is worse than
+      none. The field exists for when one is checked.
+    - **PCL-5 threshold is 31**, the screening end of the 31-33 range
+      (ISTSS: lower to maximise detection). The note says to treat 33 as
+      the line where fewer false positives matter more.
+    - **The threshold is "at or above".** A direction field was in the
+      sketch above; every seeded instrument scores higher-is-worse, so it
+      is left out until one does not (a `u8` is not a design).
+    - **Registry stores a total score, never item text**, so no
+      questionnaire wording is reproduced. Licence status is about a
+      deployment's right to use the instrument.
+    - `screen_positive` is derived on read in the measure response and
+      the instance detail, never stored; a measure naming no instrument,
+      no threshold or no score reports `null`.
+    **Original sketch** (kept for the reasoning): An
     optional `instrument` column, validated against a closed,
     code-reviewed catalogue in `src/instruments.rs`. Each entry
     carries: id, display name, score range, administration
@@ -1682,3 +1720,44 @@ manual check confirms it. Split tasks too big for one PR
       against, and the framework has no published reliability. Build
       it when a deployment wants its review cycles beside the pathway
       they changed, not before. See OQ-12.
+
+  - [ ] **T-15h — Record-level decisions on the instance layer.**
+    <a id="t-15h"></a>Found while closing T-15a (2026-11-13): an
+    enrolment is reachable by anyone the blanket guard admits. With
+    `CARE_PATHWAY_REQUIRE_AUTH` on and the default policy (read allowed),
+    any authenticated caller can read any instance's `subject_ref`,
+    steps, events, measures and segments, whatever the template's
+    `sensitive_setting` or a policy says. The same gap is the open
+    question "Instance-layer privacy for `subject_ref`" in the service
+    spec §16. It matters more now that T-15 puts mental-health scores
+    there. The links and export controllers already take the decision
+    (`authorize_record` against the template's attributes); the instance
+    and TBA controllers do not.
+    - **Decision per request, against the template.** Load the
+      instance's pathway template, derive `care_pathway_resource_attrs`,
+      and call `authorize_record` (read for `GET`, write for
+      `POST`). A no-op with the flag off, like every record-level check.
+    - **A denial is `404`, not `403`**, for the reason cross-service
+      linking §10.2 gives for journey edges: "an enrolment exists here
+      and you may not see it" is itself a disclosure on a mental-health
+      pathway. (The pathway *template* endpoints keep `403`: a template
+      names no one.)
+    - **A `mask` obligation** withholds `subject_ref` and every measure
+      whose instrument category is `mental_health`.
+    - **Aggregates follow the single read.** `cohort`, `outcomes`,
+      `time-analysis`, `constraints`, the flow gauges and the
+      `event_log` / `journey_features` exports must not reveal more than
+      the instance read would (security invariant 5). Note in particular
+      that `/metrics.prom` is on the public allow-list and the flow
+      gauges are labelled by pathway: check what they disclose for a
+      sensitive pathway before closing this.
+    - **Acceptance:** with a policy denying `dept=outsider` on
+      `resource.sensitive_setting=true`, that caller gets `404` on the
+      detail, list, cohort, outcomes, segments and time-analysis of an
+      instance on a pathway coded `F43.1`, and `200` on an orthopaedic
+      one; the same caller under a `mask` rule gets the instance with
+      `subject_ref` and mental-health measures withheld; every
+      existing instance test is unchanged with the flag off.
+    - **Order.** First among the remaining T-15 sub-tasks: T-15c and
+      T-15d add aggregate screening views over exactly this data, and
+      should not ship on an unprotected layer.

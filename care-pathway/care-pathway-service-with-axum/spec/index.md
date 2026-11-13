@@ -1521,6 +1521,26 @@ the evidence bundle.
   including a record-level-decision proof that a non-sensitive-setting
   read is *not* masked by the same policy) + 1 enforcement + 1
   outbox-audit green vs Postgres 18; 246 lib tests; fmt + clippy clean.
+- [x] **2026-11-13 — Instrument catalogue for measures (entity T-15b).**
+  Migration `…00000018_measure_instrument` adds a nullable
+  `instance_measures.instrument`. `src/instruments.rs` is a code-reviewed
+  catalogue (IPAT, PCL-5, PHQ-9, GAD-7, IES-R, HADS-A/D): range, an
+  optional "at or above" screen threshold, citation, licence status and
+  note. A measure naming an `instrument` must carry an in-range numeric
+  `value_numeric` (`422` otherwise; an unknown id is a `422`, not a free
+  name) and its `name` defaults to the instrument's. The measure response
+  and the instance detail carry a derived `screen_positive` (never
+  stored; `null` where there is no instrument, threshold or score).
+  `GET /api/instances/instruments` serves the catalogue. A free-named
+  measure round-trips as before. **Not claimed:** no licence is marked
+  open (every "free to use" claim found was secondary), no LOINC code is
+  seeded, IES-R carries no threshold (the usual 33 is not
+  author-endorsed), and HADS is `restricted` with no threshold.
+  *Verified:* five unit tests (completeness, restricted entries carry no
+  threshold, range at both ends and non-finite input, inclusive
+  threshold, nothing derived without a defended threshold) and a
+  DB-gated request test over the endpoint; `.sqlx/` regenerated for the
+  three changed queries.
 - [x] **2026-11-13 — Sensitivity follows content, not only setting
   (entity T-15a, condition-code half).** `care_pathway_resource_attrs`
   now sets `resource.sensitive_setting=true` when any condition code is

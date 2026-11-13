@@ -9,6 +9,18 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — instrument catalogue for measures (entity T-15b)
+
+- `POST /api/instances/{pid}/measures` accepts an `instrument` id. The
+  measure is then that instrument's total score: `value_numeric` is
+  required and range-checked, and `name` defaults to the instrument's.
+  Responses carry a derived `screen_positive`. New
+  `GET /api/instances/instruments` serves the catalogue (IPAT, PCL-5,
+  PHQ-9, GAD-7, IES-R, HADS-A/D). Migration `…00000018` adds a nullable
+  `instance_measures.instrument`. Free-named measures are unchanged. A
+  screen is not a diagnosis, and no licence is marked confirmed: see each
+  entry's `licence_note`.
+
 ### Changed — sensitivity follows content (entity T-15a)
 
 - `resource.sensitive_setting` is now `true` for a pathway with any

@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "INSERT INTO instance_measures\n                   (pid, instance_pid, name, value_numeric, value_text, unit, recorded_on)\n               VALUES ($1, $2, $3, $4, $5, $6, $7)\n               RETURNING created_at AS \"created_at: _\", updated_at AS \"updated_at: _\",\n                         id, pid, instance_pid, name, value_numeric, value_text, unit,\n                         recorded_on",
+  "query": "SELECT created_at AS \"created_at: _\", updated_at AS \"updated_at: _\",\n                      id, pid, instance_pid, name, value_numeric, value_text, unit,\n                      recorded_on, instrument\n               FROM instance_measures\n               WHERE instance_pid = ANY($1)",
   "describe": {
     "columns": [
       {
@@ -112,17 +112,22 @@
             "name": "recorded_on"
           }
         }
+      },
+      {
+        "ordinal": 10,
+        "name": "instrument",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "instance_measures",
+            "name": "instrument"
+          }
+        }
       }
     ],
     "parameters": {
       "Left": [
-        "Uuid",
-        "Uuid",
-        "Varchar",
-        "Float8",
-        "Varchar",
-        "Varchar",
-        "Date"
+        "UuidArray"
       ]
     },
     "nullable": [
@@ -135,8 +140,9 @@
       true,
       true,
       true,
-      false
+      false,
+      true
     ]
   },
-  "hash": "0e2fe3a9988be6861bb56e276cee6cf2ae610b614501461b4c72d9b995aab483"
+  "hash": "16bc437e08d16b5afd4bb89e1430606203a49c002459944dca20f425e1ecc471"
 }

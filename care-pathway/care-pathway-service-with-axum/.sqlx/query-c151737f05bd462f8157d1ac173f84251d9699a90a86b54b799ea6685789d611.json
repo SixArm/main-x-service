@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT created_at AS \"created_at: _\", updated_at AS \"updated_at: _\",\n                      id, pid, instance_pid, name, value_numeric, value_text, unit,\n                      recorded_on\n               FROM instance_measures\n               WHERE instance_pid = ANY($1)",
+  "query": "SELECT created_at AS \"created_at: _\", updated_at AS \"updated_at: _\",\n                      id, pid, instance_pid, name, value_numeric, value_text, unit,\n                      recorded_on, instrument\n               FROM instance_measures\n               WHERE instance_pid = $1\n               ORDER BY recorded_on DESC",
   "describe": {
     "columns": [
       {
@@ -112,11 +112,22 @@
             "name": "recorded_on"
           }
         }
+      },
+      {
+        "ordinal": 10,
+        "name": "instrument",
+        "type_info": "Varchar",
+        "origin": {
+          "Table": {
+            "table": "instance_measures",
+            "name": "instrument"
+          }
+        }
       }
     ],
     "parameters": {
       "Left": [
-        "UuidArray"
+        "Uuid"
       ]
     },
     "nullable": [
@@ -129,8 +140,9 @@
       true,
       true,
       true,
-      false
+      false,
+      true
     ]
   },
-  "hash": "5049f63f0b5dfdecf386f29202ef1b59d74d388df6f140736fa43d1fe31761d7"
+  "hash": "c151737f05bd462f8157d1ac173f84251d9699a90a86b54b799ea6685789d611"
 }
