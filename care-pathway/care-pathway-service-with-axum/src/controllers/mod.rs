@@ -1,5 +1,7 @@
 //! HTTP controllers for the care-pathway service.
 
+/// Record-level access to the instance layer (spec T-15h).
+pub mod access;
 pub mod care_pathways;
 /// Compliance-evidence endpoints (`/api/compliance*`): posture, SBOM, and
 /// audit-chain verification.

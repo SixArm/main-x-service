@@ -1721,7 +1721,34 @@ manual check confirms it. Split tasks too big for one PR
       it when a deployment wants its review cycles beside the pathway
       they changed, not before. See OQ-12.
 
-  - [ ] **T-15h — Record-level decisions on the instance layer.**
+  - [x] **T-15h — Record-level decisions on the instance layer.**
+    **Done 2026-11-14** (`src/controllers/access.rs`, test binary
+    `tests/instance_authz.rs`). Decisions taken while building it:
+    - Reads: instance detail, pathway instance list, `cohort`, `outcomes`,
+      the per-instance and cohort time-analysis views, `process-map`,
+      `variants`, `data-quality`, `segments`, `timeline`. Writes: enrol,
+      status, review, urgency, team, events, measures, step completion,
+      segment and clock. Denial is `404`, and `401` is left alone.
+    - **A masked caller may read, not write.** Write responses carry
+      `subject_ref`; refusing is fail-closed and simpler than masking
+      each one. A policy that wants masked writes has no use yet.
+    - **Under `mask`, a free-named measure is withheld too**, not only a
+      mental-health instrument: a measure with no `instrument` cannot be
+      shown not to be a hand-typed PHQ-9. This is stricter than the
+      bullet below and deliberate. `outcomes` drops the same measures from
+      its summary.
+    - **Cross-pathway views** (`caseload`, `overdue-reviews`, `stalled`,
+      `care-team-load`, `flow` without a pathway) leave a denied
+      pathway out and null `subject_ref` under `mask`. A per-request memo
+      keeps it to one template load per pathway.
+    - **`/metrics.prom`**: the refresh loop has no caller, so with
+      enforcement on a pathway whose `sensitive_setting` is true is
+      counted as suppressed and never labelled. With enforcement off
+      nothing changes.
+    - Not changed: `exports` already gate on `destructive` against the
+      template; links already took the decision. Both were left alone.
+    The original brief follows.
+    
     <a id="t-15h"></a>Found while closing T-15a (2026-11-13): an
     enrolment is reachable by anyone the blanket guard admits. With
     `CARE_PATHWAY_REQUIRE_AUTH` on and the default policy (read allowed),

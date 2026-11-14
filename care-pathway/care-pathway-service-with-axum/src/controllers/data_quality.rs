@@ -80,6 +80,7 @@ async fn load_dq_inputs(
 #[debug_handler]
 async fn data_quality(
     State(ctx): State<AppContext>,
+    caller: crate::auth::MaybeAuthUser,
     Path(pathway): Path<String>,
     Query(query): Query<DataQualityQuery>,
 ) -> Result<Response> {
@@ -88,6 +89,13 @@ async fn data_quality(
     let template = PathwayModel::find_by_pid(&ctx.db, &pathway)
         .await
         .map_err(|_| Error::NotFound)?;
+    crate::controllers::access::pathway_access(
+        &ctx,
+        &caller,
+        authentication_verifier::Action::Read,
+        template.pid,
+    )
+    .await?;
     let instances = load_cohort(&ctx, template.pid, query.status.as_deref()).await?;
     let analyses = analyze_cohort(&ctx, &instances, as_of_ms).await?;
 

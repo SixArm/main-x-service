@@ -8846,9 +8846,9 @@ Kept as they were by worker's SQ-1, then fixed (crate spec §13).
 
 - [ ] **TI-1 (L)** care-pathway **T-15a … T-15h**, the entity-level
   queue. It is tracked there, not here. **Progress 2026-11-13:** T-15a
-  (condition-code half) and T-15b are done. T-15h is next, ahead of
-  T-15c / T-15d, because those add aggregate views over instance data
-  that currently has no record-level protection. Then T-15e / T-15f;
+  (condition-code half), T-15b and **T-15h** (2026-11-14) are done, so
+  T-15c / T-15d may now add aggregate views over protected data. Then
+  T-15e / T-15f;
   T-15g only on a deployment's request.
 - [ ] **TI-2 (S)** Write the rule T-15a settles into
   [`agents/share/privacy.md`](agents/share/privacy.md):

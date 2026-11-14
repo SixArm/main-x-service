@@ -399,10 +399,10 @@ needs a machine and an owner.
 
 **Phase 14 — Trauma-informed recovery pathways (Theme H).** The order
 changed on 2026-11-13, when closing T-15a showed the instance layer takes
-no record-level decision at all. T-15a and T-15b are done; **T-15h (a
-decision on every instance read and write) goes next, ahead of the
-screening views**, because T-15c and T-15d aggregate exactly the data it
-protects. TI-2 follows T-15h. TI-3 is independent and also unblocks
+no record-level decision at all. T-15a, T-15b and **T-15h (a decision on
+every instance read and write, done 2026-11-14)** are done, so the
+screening views T-15c and T-15d can now aggregate protected data. TI-2
+can now be written. TI-3 is independent and also unblocks
 stitched journeys generally.
 
 ## 4. Working agreements (for the executing session)

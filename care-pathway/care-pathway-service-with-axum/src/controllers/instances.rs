@@ -11,7 +11,10 @@ use axa::extract::{Json, Path, Query};
 use axa::prelude::*;
 use uuid::Uuid;
 
+use authentication_verifier::Action;
+
 use crate::auth::MaybeAuthUser;
+use crate::controllers::access;
 use crate::instances as rules;
 use crate::instruments;
 use crate::models::audit_logs::Model as Audit;
@@ -70,6 +73,35 @@ async fn find_instance(ctx: &AppContext, raw: &str) -> Result<pathway_instances:
         .ok_or(Error::NotFound)
 }
 
+/// Find one live instance and take the record-level decision on it
+/// (spec T-15h). A caller under a `mask` obligation may read but not
+/// write: the write responses carry `subject_ref`, so fail closed.
+async fn authorized_instance(
+    ctx: &AppContext,
+    caller: &MaybeAuthUser,
+    action: Action,
+    raw: &str,
+) -> Result<(pathway_instances::Model, access::Access)> {
+    let instance = find_instance(ctx, raw).await?;
+    let granted = access::instance_access(ctx, caller, action, &instance).await?;
+    if granted.masked && action != Action::Read {
+        return Err(Error::NotFound);
+    }
+    Ok((instance, granted))
+}
+
+/// An instance as JSON, with `subject_ref` withheld under a `mask`
+/// obligation.
+fn mask_instance(instance: &pathway_instances::Model, access: access::Access) -> serde_json::Value {
+    let mut value = serde_json::to_value(instance).unwrap_or_default();
+    if access.masked
+        && let Some(object) = value.as_object_mut()
+    {
+        object.insert("subject_ref".to_string(), serde_json::Value::Null);
+    }
+    value
+}
+
 /// `POST /api/care-pathways/{pathway}/instances` body.
 #[derive(Debug, serde::Deserialize)]
 struct EnrollPayload {
@@ -110,6 +142,12 @@ async fn enroll(
     let template = PathwayModel::find_by_pid(&ctx.db, &pathway)
         .await
         .map_err(|_| Error::NotFound)?;
+    if access::pathway_access(&ctx, &caller, Action::Write, template.pid)
+        .await?
+        .masked
+    {
+        return Err(Error::NotFound);
+    }
     let mut txn = ctx.db.begin().await?;
     let instance = pathway_instances::Model::insert(
         &mut *txn,
@@ -162,30 +200,45 @@ async fn enroll(
 #[debug_handler]
 async fn list_for_pathway(
     State(ctx): State<AppContext>,
+    caller: MaybeAuthUser,
     Path(pathway): Path<String>,
 ) -> Result<Response> {
     let template = PathwayModel::find_by_pid(&ctx.db, &pathway)
         .await
         .map_err(|_| Error::NotFound)?;
+    let granted = access::pathway_access(&ctx, &caller, Action::Read, template.pid).await?;
     let rows = pathway_instances::Model::for_pathway_newest_first(&ctx.db, template.pid).await?;
-    format::json(rows)
+    format::json(
+        rows.iter()
+            .map(|r| mask_instance(r, granted))
+            .collect::<Vec<_>>(),
+    )
 }
 
 /// `GET /api/instances/{pid}` — one instance with its steps, care team,
 /// and event log.
 #[debug_handler]
-async fn get_instance(State(ctx): State<AppContext>, Path(raw): Path<String>) -> Result<Response> {
-    let instance = find_instance(&ctx, &raw).await?;
+async fn get_instance(
+    State(ctx): State<AppContext>,
+    caller: MaybeAuthUser,
+    Path(raw): Path<String>,
+) -> Result<Response> {
+    let (instance, access) = authorized_instance(&ctx, &caller, Action::Read, &raw).await?;
     let mut steps = instance_steps::Model::for_instance(&ctx.db, instance.pid).await?;
     steps.sort_by_key(|s| s.position);
     let team = instance_team::Model::for_instance(&ctx.db, instance.pid).await?;
     let events = instance_events::Model::for_instance_newest_first(&ctx.db, instance.pid).await?;
     let measures =
         instance_measures::Model::for_instance_newest_first(&ctx.db, instance.pid).await?;
-    let measures: Vec<MeasureView<'_>> = measures.iter().map(MeasureView::of).collect();
+    let measures: Vec<MeasureView<'_>> = measures
+        .iter()
+        .filter(|m| !(access.masked && access::withheld_when_masked(m)))
+        .map(MeasureView::of)
+        .collect();
     format::json(serde_json::json!({
-        "instance": instance, "steps": steps, "team": team,
+        "instance": mask_instance(&instance, access), "steps": steps, "team": team,
         "events": events, "measures": measures,
+        "masked": access.masked,
     }))
 }
 
@@ -218,7 +271,9 @@ async fn set_status(
             rules::OUTCOMES
         )));
     }
-    let instance = find_instance(&ctx, &raw).await?;
+    let instance = authorized_instance(&ctx, &caller, Action::Write, &raw)
+        .await?
+        .0;
     rules::instance_transition(&instance.status, &payload.to).map_err(|r| refuse(&r))?;
     if payload.outcome.is_some() && !rules::is_terminal(&payload.to) {
         return Err(refuse(
@@ -275,7 +330,9 @@ async fn record_review(
     Path(raw): Path<String>,
     Json(payload): Json<ReviewPayload>,
 ) -> Result<Response> {
-    let instance = find_instance(&ctx, &raw).await?;
+    let instance = authorized_instance(&ctx, &caller, Action::Write, &raw)
+        .await?
+        .0;
     if rules::is_terminal(&instance.status) {
         return Err(refuse("a closed instance is not reviewed"));
     }
@@ -326,7 +383,9 @@ async fn set_urgency(
             rules::URGENCY_LEVELS
         )));
     }
-    let instance = find_instance(&ctx, &raw).await?;
+    let instance = authorized_instance(&ctx, &caller, Action::Write, &raw)
+        .await?
+        .0;
     let from_rank = rules::URGENCY_LEVELS
         .iter()
         .position(|u| *u == instance.urgency);
@@ -367,7 +426,9 @@ async fn complete_step(
     caller: MaybeAuthUser,
     Path((raw, step_raw)): Path<(String, String)>,
 ) -> Result<Response> {
-    let instance = find_instance(&ctx, &raw).await?;
+    let instance = authorized_instance(&ctx, &caller, Action::Write, &raw)
+        .await?
+        .0;
     let step = instance_steps::Model::find_by_pid(&ctx.db, pid(&step_raw)?)
         .await?
         .filter(|s| s.instance_pid == instance.pid)
@@ -417,7 +478,9 @@ async fn add_team_member(
             rules::TEAM_ROLES
         )));
     }
-    let instance = find_instance(&ctx, &raw).await?;
+    let instance = authorized_instance(&ctx, &caller, Action::Write, &raw)
+        .await?
+        .0;
     let existing =
         instance_team::Model::find(&ctx.db, instance.pid, &payload.member_ref, &payload.role)
             .await?;
@@ -463,7 +526,9 @@ async fn add_event(
             rules::EVENT_KINDS
         )));
     }
-    let instance = find_instance(&ctx, &raw).await?;
+    let instance = authorized_instance(&ctx, &caller, Action::Write, &raw)
+        .await?
+        .0;
     let row = instance_events::Model::insert(
         &ctx.db,
         instance.pid,
@@ -478,12 +543,33 @@ async fn add_event(
 
 // ─── Derived views ──────────────────────────────────────────────────────────
 
+/// The open instances the caller may read, each with its access: those
+/// on a pathway the record-level policy denies are left out, so an
+/// aggregate never reveals more than the single read (spec T-15h).
+async fn visible_open(
+    ctx: &AppContext,
+    caller: &MaybeAuthUser,
+) -> Result<Vec<(pathway_instances::Model, access::Access)>> {
+    let mut visibility = access::Visibility::new(ctx, caller);
+    let mut out = Vec::new();
+    for instance in pathway_instances::Model::open(&ctx.db).await? {
+        if let Some(granted) = visibility.read(instance.pathway_pid).await? {
+            out.push((instance, granted));
+        }
+    }
+    Ok(out)
+}
+
 /// `GET /api/instances/caseload` — active instances by care setting and
 /// urgency (setting comes from each instance's pathway template), plus
 /// the emergency/urgent count.
 #[debug_handler]
-async fn caseload(State(ctx): State<AppContext>) -> Result<Response> {
-    let instances = pathway_instances::Model::open(&ctx.db).await?;
+async fn caseload(State(ctx): State<AppContext>, caller: MaybeAuthUser) -> Result<Response> {
+    let instances: Vec<pathway_instances::Model> = visible_open(&ctx, &caller)
+        .await?
+        .into_iter()
+        .map(|(i, _)| i)
+        .collect();
     let templates = PathwayModel::list(&ctx.db, 1000).await?;
     let mut setting_of: std::collections::BTreeMap<Uuid, String> =
         std::collections::BTreeMap::new();
@@ -525,12 +611,12 @@ async fn caseload(State(ctx): State<AppContext>) -> Result<Response> {
 /// `next_review_on` has passed (or is unset), most overdue first — the
 /// chronic-management review register.
 #[debug_handler]
-async fn overdue_reviews(State(ctx): State<AppContext>) -> Result<Response> {
+async fn overdue_reviews(State(ctx): State<AppContext>, caller: MaybeAuthUser) -> Result<Response> {
     let today = chrono::Utc::now().date_naive();
-    let instances = pathway_instances::Model::open(&ctx.db).await?;
+    let instances = visible_open(&ctx, &caller).await?;
     let mut rows: Vec<(i64, serde_json::Value)> = instances
         .iter()
-        .filter_map(|instance| {
+        .filter_map(|(instance, granted)| {
             let overdue_days = instance
                 .next_review_on
                 .map_or(i64::MAX, |due| (today - due).num_days());
@@ -539,7 +625,7 @@ async fn overdue_reviews(State(ctx): State<AppContext>) -> Result<Response> {
                     overdue_days,
                     serde_json::json!({
                         "pid": instance.pid,
-                        "subject_ref": instance.subject_ref,
+                        "subject_ref": (!granted.masked).then_some(&instance.subject_ref),
                         "urgency": instance.urgency,
                         "next_review_on": instance.next_review_on,
                         "overdue_days": if overdue_days == i64::MAX {
@@ -654,6 +740,7 @@ async fn load_last_activity_inputs(
 #[debug_handler]
 async fn stalled(
     State(ctx): State<AppContext>,
+    caller: MaybeAuthUser,
     Query(query): Query<StalledQuery>,
 ) -> Result<Response> {
     let idle_days = query
@@ -663,13 +750,13 @@ async fn stalled(
     let as_of = chrono::Utc::now();
     let as_of_ms = as_of.timestamp_millis();
 
-    let instances = pathway_instances::Model::open(&ctx.db).await?;
-    let pids: Vec<Uuid> = instances.iter().map(|i| i.pid).collect();
+    let instances = visible_open(&ctx, &caller).await?;
+    let pids: Vec<Uuid> = instances.iter().map(|(i, _)| i.pid).collect();
     let by_pid = load_last_activity_inputs(&ctx, &pids).await?;
 
     let mut rows: Vec<(i64, serde_json::Value)> = instances
         .iter()
-        .filter_map(|instance| {
+        .filter_map(|(instance, granted)| {
             let activity = by_pid.get(&instance.pid).copied().unwrap_or_else(|| {
                 rules::last_activity(date_ms(instance.enrolled_on), None, None, None, None)
             });
@@ -679,7 +766,7 @@ async fn stalled(
                     idle_ms,
                     serde_json::json!({
                         "pid": instance.pid,
-                        "subject_ref": instance.subject_ref,
+                        "subject_ref": (!granted.masked).then_some(&instance.subject_ref),
                         "urgency": instance.urgency,
                         "last_activity_at_ms": activity.at_ms,
                         "last_activity_source": activity.source,
@@ -707,10 +794,15 @@ async fn stalled(
 /// one pathway: instance counts by status + urgency, and step
 /// completion across the active cohort.
 #[debug_handler]
-async fn cohort(State(ctx): State<AppContext>, Path(pathway): Path<String>) -> Result<Response> {
+async fn cohort(
+    State(ctx): State<AppContext>,
+    caller: MaybeAuthUser,
+    Path(pathway): Path<String>,
+) -> Result<Response> {
     let template = PathwayModel::find_by_pid(&ctx.db, &pathway)
         .await
         .map_err(|_| Error::NotFound)?;
+    access::pathway_access(&ctx, &caller, Action::Read, template.pid).await?;
     let instances = pathway_instances::Model::cohort(&ctx.db, template.pid, None, None).await?;
     let mut by_status: std::collections::BTreeMap<String, usize> =
         std::collections::BTreeMap::new();
@@ -740,11 +832,11 @@ async fn cohort(State(ctx): State<AppContext>, Path(pathway): Path<String>) -> R
 /// `GET /api/instances/care-team-load` — active-instance count per care
 /// team member (with their roles), the per-provider caseload lens.
 #[debug_handler]
-async fn care_team_load(State(ctx): State<AppContext>) -> Result<Response> {
-    let open: std::collections::HashSet<Uuid> = pathway_instances::Model::open(&ctx.db)
+async fn care_team_load(State(ctx): State<AppContext>, caller: MaybeAuthUser) -> Result<Response> {
+    let open: std::collections::HashSet<Uuid> = visible_open(&ctx, &caller)
         .await?
         .into_iter()
-        .map(|i| i.pid)
+        .map(|(i, _)| i.pid)
         .collect();
     let team = instance_team::Model::all(&ctx.db).await?;
     // member → (open instance set, roles)
@@ -849,7 +941,9 @@ async fn record_measure(
     if payload.value_numeric.is_none() && payload.value_text.as_deref().is_none_or(str::is_empty) {
         return Err(refuse("a value_numeric or value_text is required"));
     }
-    let instance = find_instance(&ctx, &raw).await?;
+    let instance = authorized_instance(&ctx, &caller, Action::Write, &raw)
+        .await?
+        .0;
     let row = instance_measures::Model::insert(
         &ctx.db,
         &NewMeasure {
@@ -896,10 +990,15 @@ async fn instrument_catalogue() -> Result<Response> {
 /// per recorded measure name, the count + latest-value-per-instance
 /// average (numeric measures only). Derived from what was recorded.
 #[debug_handler]
-async fn outcomes(State(ctx): State<AppContext>, Path(pathway): Path<String>) -> Result<Response> {
+async fn outcomes(
+    State(ctx): State<AppContext>,
+    caller: MaybeAuthUser,
+    Path(pathway): Path<String>,
+) -> Result<Response> {
     let template = PathwayModel::find_by_pid(&ctx.db, &pathway)
         .await
         .map_err(|_| Error::NotFound)?;
+    let granted = access::pathway_access(&ctx, &caller, Action::Read, template.pid).await?;
     let instances = pathway_instances::Model::cohort(&ctx.db, template.pid, None, None).await?;
     let mut outcome_dist: std::collections::BTreeMap<String, usize> =
         std::collections::BTreeMap::new();
@@ -918,7 +1017,10 @@ async fn outcomes(State(ctx): State<AppContext>, Path(pathway): Path<String>) ->
     let instance_pids: Vec<Uuid> = instances.iter().map(|i| i.pid).collect();
     let mut measure_summary: Vec<serde_json::Value> = Vec::new();
     if !instance_pids.is_empty() {
-        let measures = instance_measures::Model::for_instances(&ctx.db, &instance_pids).await?;
+        let mut measures = instance_measures::Model::for_instances(&ctx.db, &instance_pids).await?;
+        // A masked caller's aggregate must not carry what the single
+        // read withholds.
+        measures.retain(|m| !(granted.masked && access::withheld_when_masked(m)));
         // (name) → per-instance latest (recorded_on, value)
         let mut latest: std::collections::BTreeMap<
             (String, Uuid),

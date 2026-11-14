@@ -9,6 +9,20 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Changed — record-level decisions on the instance layer (entity T-15h)
+
+- With `CARE_PATHWAY_REQUIRE_AUTH` on, every instance, cohort and
+  time-analysis endpoint now takes the record-level decision against the
+  enrolment's pathway template. **A denial is `404`**, so an enrolment on a
+  pathway the caller may not read is indistinguishable from none. A `mask`
+  obligation withholds `subject_ref` and mental-health (or unclassifiable)
+  measures, and such a caller may read but not write. `caseload`,
+  `overdue-reviews`, `stalled`, `care-team-load` and `flow` leave a denied
+  pathway out. With enforcement on, `/metrics.prom` no longer labels a
+  pathway whose `sensitive_setting` is true. With enforcement off nothing
+  changes. **Behaviour change for deployed policies:** a policy that
+  denied a pathway's read now also hides its enrolments.
+
 ### Added — instrument catalogue for measures (entity T-15b)
 
 - `POST /api/instances/{pid}/measures` accepts an `instrument` id. The

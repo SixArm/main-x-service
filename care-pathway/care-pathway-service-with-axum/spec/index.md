@@ -33,10 +33,9 @@ a journey across a service boundary instead of stopping at it (§6.19,
 [`agents/share/time-based-analysis.md`](../../../agents/share/time-based-analysis.md)
 and
 [`../../spec/time-based-analysis.md`](../../spec/time-based-analysis.md).
-Deferred (§13):
-instance-layer masking/authz for `pathway_instances.subject_ref` (the
-patient-identifying linkage — see §16),
-terminology-server code-existence checks, and gRPC. The native
+Instance-layer record-level authz and masking for
+`pathway_instances.subject_ref` is **done** (2026-11-14, §13 T-15h).
+Deferred (§13): terminology-server code-existence checks, and gRPC. The native
 (non-FHIR) bulk import/export API (§13 T-10) is **done** (2026-09-12,
 `src/bulk/`). The PASETO key-set refresh loop
 and ABAC policy hot-reload are **done** (§9/§13, 2026-08-01) — a rotated
@@ -2286,19 +2285,15 @@ terminology-server code-existence checks.
   `CARE_PATHWAY_PASETO_KEYS_REFRESH_SECS` and swaps the fetched set into
   the live `ReloadableVerifier` (§9/§13); a refetch-on-`UnknownKid` fast
   path was not additionally needed.
-- **Instance-layer privacy for `pathway_instances.subject_ref`.** The
-  privacy module landed 2026-08-02 (§13) masks the `CarePathway`
-  *template* — which names no patient — but the actual
-  patient-identifying fact is a specific person's *enrolment*, recorded
-  as `subject_ref` (a `person:<uuid>` `EntityRef`) on the instance layer
-  (`src/instances.rs`, `models/_entities/pathway_instances.rs`). That
-  linkage is the clinical analogue of the `case ↔ person` `subject_of`
-  edge (`agents/share/cross-service-linking.md` §10) — high-governance,
-  and not yet covered by any masking or record-level ABAC. Deferred
-  rather than silently left undone; needs its own resource-attribute
-  design (likely keyed on the parent pathway's `care_setting` /
-  `sensitive_setting`) before the instance controllers can honour a
-  `mask` obligation the way `care_pathways.rs` now does.
+- ~~**Instance-layer privacy for `pathway_instances.subject_ref`.**~~ —
+  RESOLVED 2026-11-14 (§13 T-15h). Every instance, cohort and
+  time-analysis handler takes the record-level decision against the
+  enrolment's pathway template (`src/controllers/access.rs`). A denial is
+  `404`; a `mask` obligation withholds `subject_ref` and mental-health
+  (or unclassifiable) measures; the cross-pathway views leave a denied
+  pathway out; and `/metrics.prom` never labels a special-category
+  pathway while enforcement is on. A masked caller may read but not
+  write.
 
 ## 17. References
 

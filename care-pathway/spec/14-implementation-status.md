@@ -59,5 +59,5 @@ See §13 T-1 for the full reasoning.
 | No localization of the operator UI | (roadmap §15; no task yet) |
 | `patient-flow` exposes no timeline endpoint, so a stay leg of a stitched journey reports `not_configured` — the contract it must satisfy is in `src/journey.rs` | patient-flow adoption |
 | The instance and insight endpoints are still absent from `openapi.json` (the TBA surface is documented; they are not) | time-based-analysis §17 |
-| The **instance layer takes no record-level decision**: an enrolment, its measures and its segments are reachable by any caller the blanket guard admits, whatever the template's `sensitive_setting` or policy says. `sensitive_setting` now follows ICD mental-health codes (2026-11-13), but that protects only the template read, links and exports | T-15h |
+| ~~The instance layer takes no record-level decision~~ — closed 2026-11-14: every instance, cohort and time-analysis handler decides against the pathway template; `/metrics.prom` withholds special-category pathways | T-15h (done) |
 | SNOMED-only coding is not recognised as mental-health content (§12.5) | T-15a (limit, no task) |

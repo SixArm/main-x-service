@@ -112,7 +112,23 @@ pub async fn refresh_once(ctx: &AppContext) -> Result<tba::FlowMetricSet> {
     // turn a refresh into an unbounded scan.
     let pathways = PathwayModel::list(&ctx.db, 1000).await?;
     let mut per_pathway = Vec::with_capacity(pathways.len());
+    let mut withheld = 0usize;
     for pathway in &pathways {
+        // `/metrics.prom` is public and labelled by pathway, so it has no
+        // caller to take a record-level decision for. With enforcement on,
+        // a special-category pathway (spec T-15h) is counted and never
+        // labelled: a series for it would tell an anonymous scraper that
+        // the pathway has a cohort and how its journeys run.
+        if crate::auth::require_auth()
+            && pathway.to_pathway().is_ok_and(|p| {
+                crate::auth::care_pathway_resource_attrs(&p)
+                    .get("sensitive_setting")
+                    .is_some_and(|v| v.iter().any(|x| x == "true"))
+            })
+        {
+            withheld += 1;
+            continue;
+        }
         let instances = crate::controllers::tba::load_cohort(ctx, pathway.pid, None).await?;
         if instances.is_empty() {
             continue;
@@ -121,7 +137,9 @@ pub async fn refresh_once(ctx: &AppContext) -> Result<tba::FlowMetricSet> {
         per_pathway.push((pathway.pid.to_string(), tba::cohort(&analyses)));
     }
 
-    let set = tba::flow_metric_rows(&per_pathway, max_pathways_from_env(), min_cohort_from_env());
+    let mut set =
+        tba::flow_metric_rows(&per_pathway, max_pathways_from_env(), min_cohort_from_env());
+    set.suppressed_pathways += withheld;
     #[allow(clippy::cast_precision_loss)] // seconds since the epoch
     Metrics::global().publish_flow(&set, as_of.timestamp() as f64);
     Ok(set)

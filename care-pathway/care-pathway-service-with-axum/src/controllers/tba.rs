@@ -9,6 +9,7 @@
 //! corrected timestamp corrects the analysis, which is exactly the
 //! correction the method exists to invite.
 
+use authentication_verifier::Action;
 use axa::error::ErrorDetail;
 use axa::extract::{Json, Path, Query};
 use axa::prelude::*;
@@ -17,6 +18,7 @@ use uuid::Uuid;
 use crate::analytics;
 use crate::auth::MaybeAuthUser;
 use crate::conformance;
+use crate::controllers::access;
 use crate::instances as rules;
 use crate::models::audit_logs::Model as Audit;
 use crate::models::care_pathways::Model as PathwayModel;
@@ -93,6 +95,37 @@ fn resolve_clock(instance: &pathway_instances::Model, as_of_ms: i64) -> tba::Clo
         stop_source,
         running,
     }
+}
+
+/// Find a pathway template and take the caller's read decision on its
+/// enrolments (spec T-15h), or `404`.
+async fn authorized_template(
+    ctx: &AppContext,
+    caller: &MaybeAuthUser,
+    raw: &str,
+) -> Result<PathwayModel> {
+    let template = PathwayModel::find_by_pid(&ctx.db, raw)
+        .await
+        .map_err(|_| Error::NotFound)?;
+    access::pathway_access(ctx, caller, Action::Read, template.pid).await?;
+    Ok(template)
+}
+
+/// Find one live instance and take the record-level decision on it
+/// (spec T-15h). A caller under a `mask` obligation may read but not
+/// write.
+async fn authorized_instance(
+    ctx: &AppContext,
+    caller: &MaybeAuthUser,
+    action: Action,
+    raw: &str,
+) -> Result<pathway_instances::Model> {
+    let instance = find_instance(ctx, raw).await?;
+    let granted = access::instance_access(ctx, caller, action, &instance).await?;
+    if granted.masked && action != Action::Read {
+        return Err(Error::NotFound);
+    }
+    Ok(instance)
 }
 
 /// Load one instance's segments, in time order, capped.
@@ -230,7 +263,7 @@ async fn record_segment(
     )
     .map_err(|reason| refuse(&reason))?;
 
-    let instance = find_instance(&ctx, &raw).await?;
+    let instance = authorized_instance(&ctx, &caller, Action::Write, &raw).await?;
 
     // Invariant 5: at most one open segment. The database enforces this
     // too (a partial unique index), so a concurrent double-POST cannot
@@ -285,8 +318,12 @@ async fn record_segment(
 /// `GET /api/instances/{pid}/segments` — this instance's segments in
 /// time order.
 #[debug_handler]
-async fn list_segments(State(ctx): State<AppContext>, Path(raw): Path<String>) -> Result<Response> {
-    let instance = find_instance(&ctx, &raw).await?;
+async fn list_segments(
+    State(ctx): State<AppContext>,
+    caller: MaybeAuthUser,
+    Path(raw): Path<String>,
+) -> Result<Response> {
+    let instance = authorized_instance(&ctx, &caller, Action::Read, &raw).await?;
     format::json(load_segments(&ctx, instance.pid).await?)
 }
 
@@ -307,7 +344,7 @@ async fn close_segment(
     Path((raw, seg)): Path<(String, String)>,
     Json(payload): Json<CloseSegmentPayload>,
 ) -> Result<Response> {
-    let instance = find_instance(&ctx, &raw).await?;
+    let instance = authorized_instance(&ctx, &caller, Action::Write, &raw).await?;
     let row = instance_segments::Model::find_in_instance(&ctx.db, pid(&seg)?, instance.pid)
         .await?
         .ok_or(Error::NotFound)?;
@@ -356,7 +393,7 @@ async fn set_clock(
     Json(payload): Json<ClockPayload>,
 ) -> Result<Response> {
     let at = payload.at.unwrap_or_else(chrono::Utc::now);
-    let instance = find_instance(&ctx, &raw).await?;
+    let instance = authorized_instance(&ctx, &caller, Action::Write, &raw).await?;
     let instance_pid = instance.pid;
     let existing_start = instance
         .clock_start_at
@@ -411,10 +448,11 @@ pub(crate) async fn analyze_instance(
 #[debug_handler]
 async fn instance_time_analysis(
     State(ctx): State<AppContext>,
+    caller: MaybeAuthUser,
     Path(raw): Path<String>,
 ) -> Result<Response> {
     let now = chrono::Utc::now();
-    let instance = find_instance(&ctx, &raw).await?;
+    let instance = authorized_instance(&ctx, &caller, Action::Read, &raw).await?;
     let analysis = analyze_instance(&ctx, &instance, now.timestamp_millis()).await?;
 
     // Conformance to the enrolled template (spec T-14i): declared step
@@ -450,11 +488,12 @@ async fn instance_time_analysis(
 #[debug_handler]
 async fn instance_timeline(
     State(ctx): State<AppContext>,
+    caller: MaybeAuthUser,
     Path(raw): Path<String>,
 ) -> Result<Response> {
     let now = chrono::Utc::now();
     let as_of_ms = now.timestamp_millis();
-    let instance = find_instance(&ctx, &raw).await?;
+    let instance = authorized_instance(&ctx, &caller, Action::Read, &raw).await?;
     let clock = resolve_clock(&instance, as_of_ms);
     let rows = load_segments(&ctx, instance.pid).await?;
     let segments: Vec<tba::Segment> = rows.iter().map(to_segment).collect();
@@ -1249,14 +1288,13 @@ fn survival_analysis(
 #[debug_handler]
 async fn cohort_time_analysis(
     State(ctx): State<AppContext>,
+    caller: MaybeAuthUser,
     Path(pathway): Path<String>,
     Query(query): Query<CohortQuery>,
 ) -> Result<Response> {
     let now = chrono::Utc::now();
     let as_of_ms = now.timestamp_millis();
-    let template = PathwayModel::find_by_pid(&ctx.db, &pathway)
-        .await
-        .map_err(|_| Error::NotFound)?;
+    let template = authorized_template(&ctx, &caller, &pathway).await?;
     let instances = load_cohort(&ctx, template.pid, query.status.as_deref()).await?;
     let analyses = analyze_cohort(&ctx, &instances, as_of_ms).await?;
     let summary = tba::cohort(&analyses);
@@ -1388,14 +1426,13 @@ async fn cohort_time_analysis(
 #[debug_handler]
 async fn cohort_constraints(
     State(ctx): State<AppContext>,
+    caller: MaybeAuthUser,
     Path(pathway): Path<String>,
     Query(query): Query<CohortQuery>,
 ) -> Result<Response> {
     let now = chrono::Utc::now();
     let as_of_ms = now.timestamp_millis();
-    let template = PathwayModel::find_by_pid(&ctx.db, &pathway)
-        .await
-        .map_err(|_| Error::NotFound)?;
+    let template = authorized_template(&ctx, &caller, &pathway).await?;
     let instances = load_cohort(&ctx, template.pid, query.status.as_deref()).await?;
     let analyses = analyze_cohort(&ctx, &instances, as_of_ms).await?;
     let summary = tba::cohort(&analyses);
@@ -1602,6 +1639,7 @@ fn render_process_map_entry<T: serde::Serialize>(
 #[debug_handler]
 async fn process_map(
     State(ctx): State<AppContext>,
+    caller: MaybeAuthUser,
     Path(pathway): Path<String>,
     Query(query): Query<ProcessMapQuery>,
 ) -> Result<Response> {
@@ -1614,9 +1652,7 @@ async fn process_map(
             )));
         }
     };
-    let template = PathwayModel::find_by_pid(&ctx.db, &pathway)
-        .await
-        .map_err(|_| Error::NotFound)?;
+    let template = authorized_template(&ctx, &caller, &pathway).await?;
     let instances = load_cohort(&ctx, template.pid, query.status.as_deref()).await?;
     let as_of_ms = chrono::Utc::now().timestamp_millis();
     let sequences = cohort_sequences(&ctx, &instances, level, as_of_ms).await?;
@@ -1716,13 +1752,12 @@ fn variant_params_from_query(query: &VariantsQuery) -> Result<variants::VariantP
 #[debug_handler]
 async fn variants_endpoint(
     State(ctx): State<AppContext>,
+    caller: MaybeAuthUser,
     Path(pathway): Path<String>,
     Query(query): Query<VariantsQuery>,
 ) -> Result<Response> {
     let params = variant_params_from_query(&query)?;
-    let template = PathwayModel::find_by_pid(&ctx.db, &pathway)
-        .await
-        .map_err(|_| Error::NotFound)?;
+    let template = authorized_template(&ctx, &caller, &pathway).await?;
     let instances = load_cohort(&ctx, template.pid, query.status.as_deref()).await?;
     let as_of_ms = chrono::Utc::now().timestamp_millis();
     let pids: Vec<Uuid> = instances.iter().map(|i| i.pid).collect();
@@ -1791,7 +1826,11 @@ struct FlowQuery {
 
 /// `GET /api/instances/flow` — queueing-theory flow analysis (spec §9).
 #[debug_handler]
-async fn flow(State(ctx): State<AppContext>, Query(query): Query<FlowQuery>) -> Result<Response> {
+async fn flow(
+    State(ctx): State<AppContext>,
+    caller: MaybeAuthUser,
+    Query(query): Query<FlowQuery>,
+) -> Result<Response> {
     let now = chrono::Utc::now();
     let window_days = query.window_days.unwrap_or(DEFAULT_WINDOW_DAYS);
     if window_days <= 0 || window_days > 3650 {
@@ -1804,10 +1843,22 @@ async fn flow(State(ctx): State<AppContext>, Query(query): Query<FlowQuery>) -> 
         let template = PathwayModel::find_by_pid(&ctx.db, raw)
             .await
             .map_err(|_| Error::NotFound)?;
+        access::pathway_access(&ctx, &caller, Action::Read, template.pid).await?;
         pathway_pid = Some(template.pid);
     }
-    let instances =
+    let mut instances =
         pathway_instances::Model::live(&ctx.db, pathway_pid, MAX_COHORT_INSTANCES).await?;
+    // Across pathways, leave out those the caller may not read.
+    if pathway_pid.is_none() {
+        let mut visibility = access::Visibility::new(&ctx, &caller);
+        let mut kept = Vec::with_capacity(instances.len());
+        for instance in instances {
+            if visibility.read(instance.pathway_pid).await?.is_some() {
+                kept.push(instance);
+            }
+        }
+        instances = kept;
+    }
 
     let arrivals = instances.iter().filter(|i| i.enrolled_on >= since).count();
     let closed_in_window: Vec<&pathway_instances::Model> = instances
