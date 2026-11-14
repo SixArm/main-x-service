@@ -9,6 +9,16 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — screening reach and timing (entity T-15c)
+
+- `GET /api/care-pathways/{pathway}/screening?instrument=` reports, for
+  one catalogued instrument, how many enrolled instances have a first
+  screen (unscreened ones stay in the denominator), the median and p90
+  days from clock start to it, and the positive share of the screened.
+  `within_days` bounds a timely screen. Reach, timing and positive share
+  are withheld together when any cell is small, and the attrition record
+  is returned. `404` for a caller denied the pathway or under `mask`.
+
 ### Changed — record-level decisions on the instance layer (entity T-15h)
 
 - With `CARE_PATHWAY_REQUIRE_AUTH` on, every instance, cohort and

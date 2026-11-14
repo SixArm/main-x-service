@@ -204,6 +204,24 @@ async fn instances_take_the_record_level_decision_of_their_pathway() {
                 .await;
             assert_eq!(ok.status_code(), 200, "{path}: {}", ok.text());
         }
+        // Screening reach is an aggregate of the same scores: denied and
+        // masked callers get 404, never the figures.
+        for who in [&outsider, &partner] {
+            let r = request
+                .get(&format!(
+                    "/api/care-pathways/{sensitive}/screening?instrument=pcl5"
+                ))
+                .add_header(who.0.clone(), who.1.clone())
+                .await;
+            assert_eq!(r.status_code(), 404, "{}", r.text());
+        }
+        let r = request
+            .get(&format!(
+                "/api/care-pathways/{sensitive}/screening?instrument=pcl5"
+            ))
+            .add_header(writer.0.clone(), writer.1.clone())
+            .await;
+        assert_eq!(r.status_code(), 200, "{}", r.text());
         // A denied write is also 404.
         let write = request
             .post(&format!("/api/instances/{s_inst}/events"))

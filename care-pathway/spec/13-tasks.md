@@ -1634,7 +1634,21 @@ manual check confirms it. Split tasks too big for one PR
       round-trips exactly as today; the catalogue test asserts every
       entry has a citation and a licence note.
 
-  - [ ] **T-15c — Screening reach and timing.** Per template, the
+  - [x] **T-15c — Screening reach and timing.** **Done 2026-11-14**
+    (`src/screening.rs`, `src/controllers/screening.rs`,
+    `GET /api/care-pathways/{pathway}/screening?instrument=&within_days=&status=`).
+    Decisions: `instrument` is required (a catalogued id, else `422`);
+    the anchor is the **clock start** only, and a named T-14d anchor is
+    not built (the response echoes `anchor: "clock_start"`); only an
+    instance's **first** screen counts, so reach is not a trajectory
+    (that is T-15d); a first screen outside `within_days` counts as
+    unscreened; a score dated before the clock is day zero. **All cells
+    are withheld together** when the cohort, screened, unscreened,
+    positive or negative count is small, because hiding one cell leaves
+    it recoverable by subtraction; the T-14g attrition record still
+    comes back. A caller denied the pathway, or under `mask`, gets `404`,
+    since every catalogued instrument is mental-health. Specified as:
+    Per template, the
     share of instances with a screening measure recorded, the time
     from clock start (or a named anchor, T-14d) to the first screen,
     and the screen-positive share. Every figure carries its

@@ -402,7 +402,7 @@ changed on 2026-11-13, when closing T-15a showed the instance layer takes
 no record-level decision at all. T-15a, T-15b and **T-15h (a decision on
 every instance read and write, done 2026-11-14)** are done, so the
 screening views T-15c and T-15d can now aggregate protected data. TI-2
-can now be written. TI-3 is independent and also unblocks
+can now be written. T-15c (screening reach) is done too (2026-11-14). TI-3 is independent and also unblocks
 stitched journeys generally.
 
 ## 4. Working agreements (for the executing session)

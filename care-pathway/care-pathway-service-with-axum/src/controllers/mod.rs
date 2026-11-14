@@ -28,6 +28,8 @@ pub mod metrics;
 /// `provenance = "import"`); this module is the operator-facing surface
 /// over `crate::models::review_queue`.
 pub mod review_queue;
+/// Screening reach and timing per pathway (spec T-15c).
+pub mod screening;
 /// Time-based analysis: segment + clock recording, and the derived
 /// per-instance, cohort, constraint and flow views.
 pub mod tba;

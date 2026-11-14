@@ -135,6 +135,7 @@ impl App {
             .add_route(controllers::insights::routes())
             .add_route(controllers::tba::pathway_routes())
             .add_route(controllers::instances::pathway_routes())
+            .add_route(controllers::screening::routes())
             .add_route(controllers::exports::routes())
             .add_route(controllers::data_quality::routes())
             .add_route(controllers::links::routes())

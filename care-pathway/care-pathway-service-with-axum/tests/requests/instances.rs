@@ -350,3 +350,89 @@ async fn instrument_measures_are_range_checked_and_screened() {
     })
     .await;
 }
+
+/// Screening reach (spec §13 T-15c): an unscreened instance is in the
+/// denominator, and one small cell withholds reach and positive share
+/// together.
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test -- --ignored`"]
+async fn screening_reach_counts_the_unscreened_and_withholds_a_small_cell() {
+    super::isolate_search_index();
+    request::<App, _, _>(|request, _ctx| async move {
+        // Enrol `total` people on a fresh pathway; the first `scored.len()`
+        // get an IPAT score each.
+        async fn cohort(
+            request: &axa_test::TestServer,
+            name: &str,
+            total: usize,
+            scored: &[u32],
+        ) -> String {
+            let template: Value = request
+                .post("/api/care-pathways")
+                .json(&json!({ "name": name, "care_setting": "Inpatient" }))
+                .await
+                .json();
+            let pathway = template["pid"].as_str().unwrap().to_string();
+            for n in 0..total {
+                let instance: Value = request
+                    .post(&format!("/api/care-pathways/{pathway}/instances"))
+                    .json(&json!({ "subject_ref": format!("person:{}", uuid::Uuid::new_v4()) }))
+                    .await
+                    .json();
+                if let Some(score) = scored.get(n) {
+                    let pid = instance["pid"].as_str().unwrap();
+                    let r = request
+                        .post(&format!("/api/instances/{pid}/measures"))
+                        .json(&json!({ "instrument": "ipat", "value_numeric": score }))
+                        .await;
+                    assert_eq!(r.status_code(), 200, "{}", r.text());
+                }
+            }
+            pathway
+        }
+
+        // 20 enrolled; 12 screened (6 at the threshold, 6 below); 8 not.
+        let scores: Vec<u32> = (0..12).map(|n| if n < 6 { 7 } else { 3 }).collect();
+        let big = cohort(&request, "Screened widely", 20, &scores).await;
+        let shown: Value = request
+            .get(&format!(
+                "/api/care-pathways/{big}/screening?instrument=ipat"
+            ))
+            .await
+            .json();
+        let figures = &shown["figures"];
+        assert_eq!(figures["withheld"], false, "{shown}");
+        assert_eq!(figures["denominator"]["enrolled"], 20, "{shown}");
+        assert_eq!(figures["reach"]["screened"], 12);
+        assert_eq!(
+            figures["reach"]["unscreened"], 8,
+            "the unscreened are counted"
+        );
+        assert_eq!(figures["positive"]["of_screened"], 12);
+        assert_eq!(figures["positive"]["count"], 6);
+        assert_eq!(shown["anchor"], "clock_start");
+        assert!(shown["attrition"].is_array());
+
+        // 8 enrolled, 1 screened: a small cell, so everything is withheld.
+        let small = cohort(&request, "Screened barely", 8, &[9]).await;
+        let held: Value = request
+            .get(&format!(
+                "/api/care-pathways/{small}/screening?instrument=ipat"
+            ))
+            .await
+            .json();
+        assert_eq!(held["figures"]["withheld"], true, "{held}");
+        assert!(held["figures"].get("reach").is_none(), "{held}");
+        assert!(held["figures"].get("positive").is_none(), "{held}");
+
+        // The instrument is required and must be catalogued.
+        for bad in [
+            format!("/api/care-pathways/{big}/screening"),
+            format!("/api/care-pathways/{big}/screening?instrument=nope"),
+        ] {
+            assert_eq!(request.get(&bad).await.status_code(), 422, "{bad}");
+        }
+    })
+    .await;
+}

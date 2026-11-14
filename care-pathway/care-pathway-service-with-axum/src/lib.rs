@@ -83,6 +83,11 @@ pub mod privacy;
 /// Durable event bus Phase 3: the outbox relay (drain → sink → mark
 /// published) + retention purge. See [`agents/share/event-bus.md`].
 pub mod relay;
+/// Disclosure control: the deployment-configurable cell-count floor,
+/// `Withhold`/`Remove` rendering, and secondary suppression of
+/// marginals for a stratified table (spec `13-tasks.md` T-14k).
+/// Screening reach and timing (spec T-15c).
+pub mod screening;
 /// Tantivy full-text search: index schema, engine, and query surface.
 pub mod search;
 /// Rule-based cohort splits: `contains=`/`excludes=` predicates and
@@ -93,9 +98,6 @@ pub mod search;
 /// throughout the controller layer.
 pub mod split;
 pub mod streaming;
-/// Disclosure control: the deployment-configurable cell-count floor,
-/// `Withhold`/`Remove` rendering, and secondary suppression of
-/// marginals for a stratified table (spec `13-tasks.md` T-14k).
 pub mod suppression;
 pub mod tasks;
 /// Time-based analysis (TBA): pure computation over an instance's

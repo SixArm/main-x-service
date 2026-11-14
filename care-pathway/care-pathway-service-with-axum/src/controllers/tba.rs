@@ -617,6 +617,17 @@ pub(crate) struct CohortQuery {
     compare: Option<bool>,
 }
 
+impl CohortQuery {
+    /// A query naming only a status lens, for the views that reuse the
+    /// attrition record (spec T-14g) without the rest of the cohort query.
+    pub(crate) fn with_status(status: Option<String>) -> Self {
+        Self {
+            status,
+            ..Self::default()
+        }
+    }
+}
+
 /// [`load_cohort`] and the attrition record's own counts (spec T-14g)
 /// both run the one cohort filter in
 /// [`pathway_instances::Model::cohort`] / [`pathway_instances::Model::count_cohort`],
@@ -637,7 +648,7 @@ pub(crate) async fn load_cohort(
 /// Build the full attrition array for one cohort response (spec
 /// T-14g): the base six-step trail, plus the rule-based-split branch
 /// (spec T-14f) when `plan` was resolved.
-async fn build_attrition(
+pub(crate) async fn build_attrition(
     ctx: &AppContext,
     template: &PathwayModel,
     query: &CohortQuery,
@@ -819,7 +830,7 @@ fn resolve_rule(query: &CohortQuery) -> Result<split::Rule> {
 /// should render — decided once from [`split::split_table`] so
 /// `time-analysis` and `constraints` can never disagree on which side
 /// is protected.
-struct SplitPlan {
+pub(crate) struct SplitPlan {
     compare: bool,
     matched_instances: Vec<pathway_instances::Model>,
     matched_analyses: Vec<tba::InstanceAnalysis>,

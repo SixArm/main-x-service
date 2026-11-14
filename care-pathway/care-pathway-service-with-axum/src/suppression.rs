@@ -32,7 +32,7 @@
 //!    suppressed cell is *rendered*, so the two modes can never disagree
 //!    on which cells are small (T-14k's own acceptance criterion).
 //!
-//! Two of TreatmentPatterns' three modes are deliberately **not**
+//! Two of `TreatmentPatterns`' three modes are deliberately **not**
 //! adopted: `mean` substitutes a made-up count (dishonest), and its
 //! `minCellCount` mode reports the suppressed cell *as* the threshold,
 //! which reads as a real count rather than a redaction.
