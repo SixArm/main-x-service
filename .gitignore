@@ -34,3 +34,6 @@ Cargo.lock
 
 # Local CI run records and logs (scripts/ci-local.sh)
 /.ci-local/
+
+# Vibe tool state
+.vibe/
