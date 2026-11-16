@@ -1,7 +1,7 @@
 //! `consumer_offsets` model — per-topic bus position + freshness
 //! watermark (spec §10.3 / §6 FR-16/17).
 
-use axa::sqlx::Db;
+use axa::postgres_sqlx::Db;
 use chrono::{DateTime, FixedOffset};
 use serde::{Deserialize, Serialize};
 

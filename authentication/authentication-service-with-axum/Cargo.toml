@@ -28,7 +28,7 @@ integrity-mac = { path = "../../integrity/integrity-mac-rust-crate" }
 # an advance against one design family does not transfer.
 sha2 = { version = "0.11" }
 sha3 = { version = "0.12" }
-axa = { version = "0.11", features = ["sqlx", "openapi", "versioning", "ratelimit"] }
+axa = { version = "0.12", features = ["postgres-sqlx", "openapi", "versioning", "ratelimit"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["float_roundtrip", "arbitrary_precision"] }
 tokio = { version = "1.54", default-features = false, features = [
@@ -49,7 +49,7 @@ sqlx = { version = "0.9", default-features = false, features = ["postgres", "run
 # `serde` for the timestamps the account export and the audit feed
 # serialize.
 chrono = { version = "0.4", features = ["serde"] }
-validator = { version = "0.20", features = ["derive"] }
+validator = { version = "0.21", features = ["derive"] }
 uuid = { version = "1.29", features = ["serde", "v4"] }
 # PASETO v4.public token signing + Ed25519 public-key publication. As the
 # central auth provider, other services verify tokens offline against the
@@ -66,7 +66,7 @@ prometheus = { version = "0.14" }
 lettre = { version = "0.11", default-features = false, features = ["builder", "hostname", "smtp-transport", "tokio1-rustls-tls"] }
 # The deliberately slow hash for SEC-A5, and CSRF token generation.
 argon2 = { version = "0.5", features = ["std"] }
-rand = "0.9"
+rand = "0.10"
 
 [features]
 # PASETO v4.public token issuance (`POST /api/auth/token`), the published
@@ -114,14 +114,14 @@ path = "src/bin/main.rs"
 required-features = []
 
 [dev-dependencies]
-axa-test = "0.2"
+axa-test = "0.3"
 # The peer-side verifier library (local path — the monorepo's 0.2 PASETO
 # verifier, not the published 0.1). Used by tests/sign_verify_contract.rs
 # to pin the duplicated-by-convention Claims shape and footer-kid contract:
 # this service signs PASETO v4.public, the verifier crate verifies, the
 # claims round-trip.
 authentication-verifier = { path = "../authentication-verifier-rust-crate", default-features = false, features = ["paseto"] }
-axa = { version = "0.11", features = ["sqlx", "openapi", "versioning", "ratelimit"] }
+axa = { version = "0.12", features = ["postgres-sqlx", "openapi", "versioning", "ratelimit"] }
 serial_test = { version = "4.0.1" }
 rstest = { version = "0.28" }
 insta = { version = "1.49", features = ["redactions", "yaml", "filters"] }
@@ -131,7 +131,7 @@ insta = { version = "1.49", features = ["redactions", "yaml", "filters"] }
 # for exactly that advisory — see `security.md` §7's 2026-08-21 entry).
 # Dev-only: never shipped in the service itself.
 p256 = { version = "0.14", features = ["ecdsa"] }
-axum-test = { version = "17.3.0" }
+axum-test = { version = "21.1.0" }
 
 # Proc macros and build scripts are not stripped. When stripping reaches
 # them, macOS refuses to load the stripped `sqlx-macros` dylib

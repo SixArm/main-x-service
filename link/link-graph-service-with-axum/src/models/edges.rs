@@ -2,7 +2,7 @@
 //! (spec §6 FR-4/5/6/7). All writes here are event-driven; there is no
 //! world-facing edge write path.
 
-use axa::sqlx::Db;
+use axa::postgres_sqlx::Db;
 use chrono::{DateTime, FixedOffset, NaiveDate};
 use serde::{Deserialize, Serialize};
 use sqlx::PgConnection;

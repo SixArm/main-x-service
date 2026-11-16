@@ -28,7 +28,7 @@
 use std::collections::VecDeque;
 use std::sync::{Mutex, OnceLock};
 
-use axa::sqlx::Db;
+use axa::postgres_sqlx::Db;
 use case_matcher::Case;
 use serde::{Deserialize, Serialize};
 use sqlx::{PgConnection, PgPool};

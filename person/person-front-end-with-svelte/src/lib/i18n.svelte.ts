@@ -114,8 +114,7 @@ const STRINGS = {
     "review.compare.a": "السجل أ",
     "review.compare.b": "السجل ب",
     "review.compare.none": "غير مسجَّل",
-    "review.compare.partial":
-      "تعذَّر تحميل أحد السجلين — ربما تم دمجه أو حذفه.",
+    "review.compare.partial": "تعذَّر تحميل أحد السجلين — ربما تم دمجه أو حذفه.",
     "review.field.score": "نتيجة المطابقة",
     "review.field.quality": "جودة المطابقة",
     "review.field.method": "طريقة الكشف",
@@ -319,8 +318,7 @@ const STRINGS = {
     "links.error.required": "مرجع الهدف مطلوب.",
     "links.error.malformedRef":
       "المرجع بالصيغة type:uuid، مثل worker:0c4f1e2a-0000-4000-8000-000000000000.",
-    "links.error.wrongType.prefix":
-      "يتطلب هذا النوع من الروابط هدفًا من النوع ",
+    "links.error.wrongType.prefix": "يتطلب هذا النوع من الروابط هدفًا من النوع ",
     "links.error.wrongType.suffix": ".",
     // Bulk import / export (FE-3)
     "nav.bulk": "جماعي",
@@ -347,8 +345,7 @@ const STRINGS = {
     "bulk.export.parquetNote":
       "Parquet ميزة بناء اختيارية؛ ستفشل المهمة إذا بُنيت الخدمة بدونها.",
     "bulk.export.query": "استعلام (اختياري)",
-    "bulk.export.queryHint":
-      "بحث باسم العائلة يحصر التصدير؛ اتركه فارغًا للكل.",
+    "bulk.export.queryHint": "بحث باسم العائلة يحصر التصدير؛ اتركه فارغًا للكل.",
     "bulk.export.limit": "الحد (اختياري)",
     "bulk.export.limitHint": "أقصى عدد من السجلات للكتابة.",
     "bulk.export.masking": "نمط الإخفاء",
@@ -447,8 +444,7 @@ const STRINGS = {
     "splash.benefits.4.body":
       "تُخفى الحقول الحساسة ما لم يكن من حقك الاطلاع عليها.",
     "splash.benefits.5.title": "لا شيء بلا توثيق",
-    "splash.benefits.5.body":
-      "يُدقَّق كل تغيير، فتعرف دائمًا من فعل ماذا ومتى.",
+    "splash.benefits.5.body": "يُدقَّق كل تغيير، فتعرف دائمًا من فعل ماذا ومتى.",
     "splash.benefits.6.title": "يناسب أنظمتك",
     "splash.benefits.6.body":
       "واجهات REST وFHIR القياسية تتصل بالأدوات التي تستخدمها بالفعل.",
@@ -456,8 +452,7 @@ const STRINGS = {
     "splash.features.1.body":
       "أسماء ومعرّفات وعناوين وجهات اتصال منظَّمة، يُتحقَّق منها أثناء الكتابة.",
     "splash.features.2.title": "فحص المطابقة",
-    "splash.features.2.body":
-      "قارن مرشَّحًا بالسجل واحصل على نتائج مُقيَّمة ومُفسَّرة.",
+    "splash.features.2.body": "قارن مرشَّحًا بالسجل واحصل على نتائج مُقيَّمة ومُفسَّرة.",
     "splash.features.3.title": "دمج السجلات",
     "splash.features.3.body":
       "ادمج التكرارات المؤكَّدة في سجل واحد دون فقدان التاريخ.",
@@ -3064,8 +3059,7 @@ const STRINGS = {
     "new.create": "बनाएँ",
     "new.possibleDuplicates": "संभावित डुप्लिकेट",
     "new.duplicatesDetected.prefix": "डुप्लिकेट का पता चला (",
-    "new.duplicatesDetected.suffix":
-      ") — पुनः सबमिट करने से पहले नीचे समीक्षा करें।",
+    "new.duplicatesDetected.suffix": ") — पुनः सबमिट करने से पहले नीचे समीक्षा करें।",
     "match.head.title": "मिलान जाँच · व्यक्ति सेवा",
     "match.title": "मिलान जाँच",
     "match.family": "कुलनाम",
@@ -3111,8 +3105,7 @@ const STRINGS = {
     "detail.delete": "हटाएँ",
     "detail.showMasked": "मास्क्ड दिखाएँ",
     "detail.showFull": "पूर्ण दिखाएँ",
-    "detail.maskedNotice":
-      "मास्क्ड दृश्य दिखाया जा रहा है — कुछ फ़ील्ड छिपे हुए हैं।",
+    "detail.maskedNotice": "मास्क्ड दृश्य दिखाया जा रहा है — कुछ फ़ील्ड छिपे हुए हैं।",
     "detail.exportGdpr": "डेटा निर्यात करें (GDPR)",
     "detail.exportingGdpr": "निर्यात हो रहा है…",
     "detail.identity": "पहचान",
@@ -3300,8 +3293,7 @@ const STRINGS = {
     "splash.trust.5.body":
       "OpenAPI के साथ REST, और जहाँ स्वास्थ्य प्रणालियों को ज़रूरत हो वहाँ HL7 FHIR।",
     "splash.trust.6.title": "आपकी भाषा में",
-    "splash.trust.6.body":
-      "अरबी, चीनी, जर्मन, अंग्रेज़ी, फ़्रेंच, हिन्दी, स्पेनिश और वेल्श।",
+    "splash.trust.6.body": "अरबी, चीनी, जर्मन, अंग्रेज़ी, फ़्रेंच, हिन्दी, स्पेनिश और वेल्श।",
     "splash.cta.title": "शुरू करने के लिए तैयार हैं?",
     "splash.cta.body":
       "अपने ईमेल पर भेजे गए मैजिक लिंक से साइन इन करें। पासवर्ड की ज़रूरत नहीं।",
@@ -3353,8 +3345,7 @@ const STRINGS = {
     "tour.start.title": "शुरू करने से पहले",
     "tour.start.summary":
       "वास्तविक डेटा के साथ काम करने के लिए खाता चाहिए। साइन इन में एक मिनट से कम लगता है और पासवर्ड की ज़रूरत नहीं।",
-    "tour.start.step.1":
-      "ऊपर दाईं ओर साइन इन चुनें और अपना ईमेल पता दर्ज करें।",
+    "tour.start.step.1": "ऊपर दाईं ओर साइन इन चुनें और अपना ईमेल पता दर्ज करें।",
     "tour.start.step.2":
       "हमारे भेजे मैजिक लिंक को खोलें। यह एक ही बार काम करता है और जल्दी समाप्त हो जाता है।",
     "tour.start.step.3":

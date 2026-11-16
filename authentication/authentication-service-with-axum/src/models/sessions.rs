@@ -248,7 +248,7 @@ impl Model {
     ///
     /// When the query fails.
     pub async fn find_all_by_user_pid(
-        db: impl Into<axa::sqlx::Db<'_>>,
+        db: impl Into<axa::postgres_sqlx::Db<'_>>,
         user_pid: Uuid,
     ) -> ModelResult<Vec<Self>> {
         let mut conn = db.into().acquire().await?;
@@ -282,7 +282,7 @@ impl Model {
     ///
     /// When a query or update fails.
     pub async fn revoke_all_for_user(
-        db: impl Into<axa::sqlx::Db<'_>>,
+        db: impl Into<axa::postgres_sqlx::Db<'_>>,
         user_pid: Uuid,
     ) -> ModelResult<usize> {
         let mut conn = db.into().acquire().await?;
@@ -306,7 +306,7 @@ impl Model {
     ///
     /// When the update fails.
     pub async fn scrub_user_agent_for_user(
-        db: impl Into<axa::sqlx::Db<'_>>,
+        db: impl Into<axa::postgres_sqlx::Db<'_>>,
         user_pid: Uuid,
     ) -> ModelResult<u64> {
         let mut conn = db.into().acquire().await?;
@@ -378,7 +378,7 @@ impl Model {
     /// # Errors
     ///
     /// When the update fails, or matches no row.
-    pub async fn revoke(self, db: impl Into<axa::sqlx::Db<'_>>) -> ModelResult<Model> {
+    pub async fn revoke(self, db: impl Into<axa::postgres_sqlx::Db<'_>>) -> ModelResult<Model> {
         let mut conn = db.into().acquire().await?;
         let row = sqlx::query_as!(
             Self,

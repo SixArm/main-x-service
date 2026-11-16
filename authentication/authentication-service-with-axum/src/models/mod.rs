@@ -9,7 +9,7 @@
 //! this directory. The schema itself is the plain SQL under
 //! `migrations/`, run by [`MIGRATOR`].
 //!
-//! A helper takes an [`axa::sqlx::Db`] (or a `&mut PgConnection` when it
+//! A helper takes an [`axa::postgres_sqlx::Db`] (or a `&mut PgConnection` when it
 //! only ever runs inside a caller's transaction), so the caller passes
 //! either the pool or a connection it already holds.
 
@@ -27,7 +27,7 @@ pub mod users;
 /// The schema migrations: the plain SQL files under `migrations/`, one
 /// `<version>_<name>.up.sql` / `.down.sql` pair each, embedded at build
 /// time. `authentication-service-cli db migrate | down | reset | status`
-/// and the boot auto-migrate run these through `axa::sqlx`.
+/// and the boot auto-migrate run these through `axa::postgres_sqlx`.
 pub static MIGRATOR: sqlx::migrate::Migrator = sqlx::migrate!("./migrations");
 
 /// A model-layer failure.

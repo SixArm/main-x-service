@@ -7,7 +7,7 @@
 //! reads three columns per person instead of reassembling whole records,
 //! so a scan of 200 000 persons is 200 queries, not millions.
 
-use axa::sqlx::Db;
+use axa::postgres_sqlx::Db;
 use chrono::NaiveDate;
 use uuid::Uuid;
 

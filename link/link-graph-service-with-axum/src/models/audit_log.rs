@@ -3,7 +3,7 @@
 //! service audits access to the underlying record; the aggregator audits
 //! access to the link, so the two trails are consistent.
 
-use axa::sqlx::Db;
+use axa::postgres_sqlx::Db;
 use chrono::{DateTime, FixedOffset, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;

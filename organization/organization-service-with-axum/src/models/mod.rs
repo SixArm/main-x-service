@@ -9,7 +9,7 @@
 //! schema itself is the plain SQL under `migrations/`, run by
 //! [`MIGRATOR`].
 //!
-//! A helper that writes takes an [`axa::sqlx::Db`], so the caller passes
+//! A helper that writes takes an [`axa::postgres_sqlx::Db`], so the caller passes
 //! either the pool or its own open transaction (`&mut *txn`). That is how
 //! an entity row, its `event_outbox` row and its audit row commit in one
 //! transaction under the `outbox` transport.
@@ -37,7 +37,7 @@ pub mod review_queue;
 /// The schema migrations: the plain SQL files under `migrations/`, one
 /// `<version>_<name>.up.sql` / `.down.sql` pair each, embedded at build
 /// time. `organization-service db migrate | down | reset | status` and the
-/// boot auto-migrate run these through `axa::sqlx`.
+/// boot auto-migrate run these through `axa::postgres_sqlx`.
 pub static MIGRATOR: sqlx::migrate::Migrator = sqlx::migrate!("./migrations");
 
 /// A model-layer failure.

@@ -1,7 +1,7 @@
 //! `transfers` — the immutable record of each move (admission
 //! placement, ward/bed transfer, discharge).
 
-use axa::sqlx::Db;
+use axa::postgres_sqlx::Db;
 use chrono::{DateTime, FixedOffset};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;

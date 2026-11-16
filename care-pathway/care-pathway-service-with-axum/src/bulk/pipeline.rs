@@ -49,7 +49,7 @@
 //! job is even created — as not-yet-supported rather than leaking or
 //! ignoring it).
 
-use axa::sqlx::Db;
+use axa::postgres_sqlx::Db;
 use sqlx::{PgConnection, PgPool};
 use uuid::Uuid;
 

@@ -112,8 +112,7 @@ const STRINGS = {
     "review.compare.a": "السجل أ",
     "review.compare.b": "السجل ب",
     "review.compare.none": "غير مسجَّل",
-    "review.compare.partial":
-      "تعذَّر تحميل أحد السجلين — ربما تم دمجه أو حذفه.",
+    "review.compare.partial": "تعذَّر تحميل أحد السجلين — ربما تم دمجه أو حذفه.",
     "review.field.score": "نتيجة المطابقة",
     "review.field.quality": "جودة المطابقة",
     "review.field.method": "طريقة الكشف",
@@ -2628,8 +2627,7 @@ const STRINGS = {
     "workers.phonetic": "ध्वन्यात्मक (Soundex)",
     "workers.recordsOne": "1 रिकॉर्ड",
     "workers.recordsOther": "{count} रिकॉर्ड",
-    "expiry.truncationNotice":
-      "{total} में से {shown} तक कर्मचारी दिखाए जा रहे हैं",
+    "expiry.truncationNotice": "{total} में से {shown} तक कर्मचारी दिखाए जा रहे हैं",
     "new.titleTab": "नया कर्मचारी · कर्मचारी सेवा",
     "new.heading": "नया कर्मचारी",
     "new.submit": "बनाएँ",
@@ -2644,8 +2642,7 @@ const STRINGS = {
     "detail.exportingGdpr": "निर्यात हो रहा है…",
     "detail.showMasked": "मास्क्ड दिखाएँ",
     "detail.showFull": "पूर्ण दिखाएँ",
-    "detail.maskedNotice":
-      "मास्क्ड दृश्य दिखाया जा रहा है — कुछ फ़ील्ड छिपे हुए हैं।",
+    "detail.maskedNotice": "मास्क्ड दृश्य दिखाया जा रहा है — कुछ फ़ील्ड छिपे हुए हैं।",
     "detail.confirmDelete":
       "इस कर्मचारी को सॉफ़्ट-डिलीट करें? इसे इंटरफ़ेस के माध्यम से पूर्ववत नहीं किया जा सकता।",
     "detail.identity": "पहचान",
@@ -2770,8 +2767,7 @@ const STRINGS = {
     "links.submitting": "लिंक किया जा रहा है…",
     "links.errRefRequired": "लक्ष्य संदर्भ आवश्यक है।",
     "links.errMalformedRef": "मान्य इकाई संदर्भ नहीं — अपेक्षित {example}।",
-    "links.errWrongTarget":
-      "इस लिंक प्रकार के लिए {expected} संदर्भ आवश्यक है।",
+    "links.errWrongTarget": "इस लिंक प्रकार के लिए {expected} संदर्भ आवश्यक है।",
     "links.errConfidenceRange": "विश्वास 0 और 1 के बीच होना चाहिए।",
     "auth.signin": "साइन इन करें",
     "auth.signout": "साइन आउट करें",
@@ -2800,8 +2796,7 @@ const STRINGS = {
     "splash.trust.5.body":
       "OpenAPI के साथ REST, और जहाँ स्वास्थ्य प्रणालियों को ज़रूरत हो वहाँ HL7 FHIR।",
     "splash.trust.6.title": "आपकी भाषा में",
-    "splash.trust.6.body":
-      "अरबी, चीनी, जर्मन, अंग्रेज़ी, फ़्रेंच, हिन्दी, स्पेनिश और वेल्श।",
+    "splash.trust.6.body": "अरबी, चीनी, जर्मन, अंग्रेज़ी, फ़्रेंच, हिन्दी, स्पेनिश और वेल्श।",
     "splash.cta.title": "शुरू करने के लिए तैयार हैं?",
     "splash.cta.body":
       "अपने ईमेल पर भेजे गए मैजिक लिंक से साइन इन करें। पासवर्ड की ज़रूरत नहीं।",
@@ -2853,8 +2848,7 @@ const STRINGS = {
     "tour.start.title": "शुरू करने से पहले",
     "tour.start.summary":
       "वास्तविक डेटा के साथ काम करने के लिए खाता चाहिए। साइन इन में एक मिनट से कम लगता है और पासवर्ड की ज़रूरत नहीं।",
-    "tour.start.step.1":
-      "ऊपर दाईं ओर साइन इन चुनें और अपना ईमेल पता दर्ज करें।",
+    "tour.start.step.1": "ऊपर दाईं ओर साइन इन चुनें और अपना ईमेल पता दर्ज करें।",
     "tour.start.step.2":
       "हमारे भेजे मैजिक लिंक को खोलें। यह एक ही बार काम करता है और जल्दी समाप्त हो जाता है।",
     "tour.start.step.3":

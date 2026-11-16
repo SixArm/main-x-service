@@ -29,7 +29,7 @@
 use std::collections::VecDeque;
 use std::sync::{Mutex, OnceLock};
 
-use axa::sqlx::Db;
+use axa::postgres_sqlx::Db;
 use care_pathway_matcher::CarePathway;
 use serde::{Deserialize, Serialize};
 use sqlx::{PgConnection, PgPool};

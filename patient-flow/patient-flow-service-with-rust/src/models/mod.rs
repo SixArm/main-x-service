@@ -16,7 +16,7 @@
 //! directory. The schema itself is the plain SQL under `migrations/`,
 //! run by [`MIGRATOR`].
 //!
-//! A helper takes an [`axa::sqlx::Db`], so the caller passes either the
+//! A helper takes an [`axa::postgres_sqlx::Db`], so the caller passes either the
 //! pool or a connection it already holds (`&mut *txn`). The handlers
 //! pass their open transaction, so the row change, its audit entry and
 //! (under the `outbox` transport) its event share one commit boundary
@@ -40,7 +40,7 @@ pub mod wards;
 /// The schema migrations: the plain SQL files under `migrations/`, one
 /// `<version>_<name>.up.sql` / `.down.sql` pair each, embedded at build
 /// time. `patient-flow-service db migrate | down | reset | status` and
-/// the boot auto-migrate run these through `axa::sqlx`.
+/// the boot auto-migrate run these through `axa::postgres_sqlx`.
 pub static MIGRATOR: sqlx::migrate::Migrator = sqlx::migrate!("./migrations");
 
 /// A model-layer failure.

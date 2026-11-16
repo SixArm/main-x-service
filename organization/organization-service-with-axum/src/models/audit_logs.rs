@@ -1,6 +1,6 @@
 //! `audit_logs` model — record and query the CRUD audit trail.
 
-use axa::sqlx::Db;
+use axa::postgres_sqlx::Db;
 use chrono::{DateTime, FixedOffset};
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;

@@ -44,7 +44,7 @@
 //! - **on** — refuse the read with `503`, disclosing nothing the service
 //!   cannot account for. Recommended for a HIPAA-facing deployment.
 
-use axa::sqlx::Db;
+use axa::postgres_sqlx::Db;
 use axum::extract::FromRequestParts;
 use axum::http::request::Parts;
 use uuid::Uuid;

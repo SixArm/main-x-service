@@ -14,7 +14,7 @@
 //! the within-entity `relationships` on the `Case` payload — these are
 //! never a matcher signal (the partition rule, §7).
 
-use axa::sqlx::Db;
+use axa::postgres_sqlx::Db;
 use chrono::{DateTime, FixedOffset, NaiveDate};
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;

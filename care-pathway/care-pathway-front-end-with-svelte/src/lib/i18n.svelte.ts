@@ -2371,8 +2371,7 @@ const STRINGS = {
     "session.pasteTokenPlaceholder": "एक्सेस टोकन चिपकाएँ",
     "session.accessToken": "एक्सेस टोकन",
     "session.useToken": "टोकन का उपयोग करें",
-    "session.hint":
-      "टोकन authentication-service से आता है (मैजिक-लिंक साइन-इन)।",
+    "session.hint": "टोकन authentication-service से आता है (मैजिक-लिंक साइन-इन)।",
     "list.title": "देखभाल मार्ग",
     "list.new": "नया देखभाल मार्ग",
     "list.more": "और लोड करें",
@@ -2405,8 +2404,7 @@ const STRINGS = {
     "detail.checkDuplicates": "डुप्लिकेट जाँचें",
     "detail.delete": "हटाएँ",
     "detail.mergedInto": "{dup} को इस रिकॉर्ड में मर्ज किया गया।",
-    "detail.cannotMergeSelf":
-      "किसी रिकॉर्ड को स्वयं में मर्ज नहीं किया जा सकता।",
+    "detail.cannotMergeSelf": "किसी रिकॉर्ड को स्वयं में मर्ज नहीं किया जा सकता।",
     "detail.potentialDuplicates": "संभावित डुप्लिकेट",
     "detail.noneAboveThreshold": "मिलान सीमा से ऊपर कोई नहीं।",
     "detail.mergeIntoConfirm": "इस रिकॉर्ड में मर्ज करें?",
@@ -2490,8 +2488,7 @@ const STRINGS = {
     "bulk.import.fileHint": "JSONL, CSV, या TSV.",
     "bulk.import.fileRequired": "इंपोर्ट के लिए एक फ़ाइल चुनें।",
     "bulk.import.format": "फ़ॉर्मैट",
-    "bulk.import.formatHint":
-      "यह फ़ाइल के वास्तविक फ़ॉर्मैट से मेल खाना चाहिए।",
+    "bulk.import.formatHint": "यह फ़ाइल के वास्तविक फ़ॉर्मैट से मेल खाना चाहिए।",
     "bulk.import.dryRun": "ड्राई रन (केवल पूर्वावलोकन, कुछ भी सहेजा नहीं जाता)",
     "bulk.import.dryRunHint":
       "कुछ भी लिखे बिना हर पंक्ति को मान्य और वर्गीकृत करता है।",
@@ -2586,8 +2583,7 @@ const STRINGS = {
     "splash.trust.5.body":
       "OpenAPI के साथ REST, और जहाँ स्वास्थ्य प्रणालियों को ज़रूरत हो वहाँ HL7 FHIR।",
     "splash.trust.6.title": "आपकी भाषा में",
-    "splash.trust.6.body":
-      "अरबी, चीनी, जर्मन, अंग्रेज़ी, फ़्रेंच, हिन्दी, स्पेनिश और वेल्श।",
+    "splash.trust.6.body": "अरबी, चीनी, जर्मन, अंग्रेज़ी, फ़्रेंच, हिन्दी, स्पेनिश और वेल्श।",
     "splash.cta.title": "शुरू करने के लिए तैयार हैं?",
     "splash.cta.body":
       "अपने ईमेल पर भेजे गए मैजिक लिंक से साइन इन करें। पासवर्ड की ज़रूरत नहीं।",
@@ -2625,8 +2621,7 @@ const STRINGS = {
     "splash.features.4.body":
       "किसी मार्ग पर नामांकन की टाइमलाइन और हस्तक्षेपों का क्रम देखें।",
     "splash.features.5.title": "समय-आधारित विश्लेषण",
-    "splash.features.5.body":
-      "समूह और यात्रा दृश्य हर मार्ग में बीते समय को मापते हैं।",
+    "splash.features.5.body": "समूह और यात्रा दृश्य हर मार्ग में बीते समय को मापते हैं।",
     "splash.features.6.title": "प्रति-मार्ग ऑडिट ट्रेल",
     "splash.features.6.body":
       "किसी भी मार्ग को खोलकर उसका पूरा परिवर्तन इतिहास देखें।",
@@ -2639,8 +2634,7 @@ const STRINGS = {
     "tour.start.title": "शुरू करने से पहले",
     "tour.start.summary":
       "वास्तविक डेटा के साथ काम करने के लिए खाता चाहिए। साइन इन में एक मिनट से कम लगता है और पासवर्ड की ज़रूरत नहीं।",
-    "tour.start.step.1":
-      "ऊपर दाईं ओर साइन इन चुनें और अपना ईमेल पता दर्ज करें।",
+    "tour.start.step.1": "ऊपर दाईं ओर साइन इन चुनें और अपना ईमेल पता दर्ज करें।",
     "tour.start.step.2":
       "हमारे भेजे मैजिक लिंक को खोलें। यह एक ही बार काम करता है और जल्दी समाप्त हो जाता है।",
     "tour.start.step.3":
@@ -2673,8 +2667,7 @@ const STRINGS = {
     "tour.s3.title": "डुप्लिकेट जाँचना, मर्ज करना और ऑडिट",
     "tour.s3.summary":
       "वही चीज़ बताने वाले मार्ग खोजें, एक को दूसरे में मिलाएँ, और हर बदलाव का पूरा इतिहास रखें।",
-    "tour.s3.step.1":
-      "जिस मार्ग को रखना है उसे खोलें और डुप्लिकेट जाँचें चुनें।",
+    "tour.s3.step.1": "जिस मार्ग को रखना है उसे खोलें और डुप्लिकेट जाँचें चुनें।",
     "tour.s3.step.2":
       "संभावित डुप्लिकेट सूची पढ़ें, या वह नोट जो बताता है कि कोई भी मिलान सीमा से ऊपर नहीं है।",
     "tour.s3.step.3":

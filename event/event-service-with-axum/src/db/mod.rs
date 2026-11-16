@@ -32,7 +32,7 @@ pub use repositories::{
 /// The schema migrations: the plain SQL files under `migrations/`, one
 /// `<version>_<name>.up.sql` / `.down.sql` pair each, embedded at build
 /// time. `event-service db migrate | down | reset | status` and the boot
-/// auto-migrate run these through `axa::sqlx`.
+/// auto-migrate run these through `axa::postgres_sqlx`.
 pub static MIGRATOR: sqlx::migrate::Migrator = sqlx::migrate!("./migrations");
 
 /// Open a connection pool using the configured URL and pool bounds.

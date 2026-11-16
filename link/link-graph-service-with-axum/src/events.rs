@@ -11,8 +11,8 @@
 //! under at-least-once delivery (event-bus.md §6). Lazy verify-on-read
 //! remains a separate, still-live path (spec §13 T-10).
 
+use axa::postgres_sqlx::Db;
 use axa::prelude::*;
-use axa::sqlx::Db;
 use chrono::{DateTime, FixedOffset, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;

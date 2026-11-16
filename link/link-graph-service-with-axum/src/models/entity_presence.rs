@@ -2,7 +2,7 @@
 //! one row per known `EntityRef`, `alive` toggled by the source service's
 //! `created` / `deleted` events.
 
-use axa::sqlx::Db;
+use axa::postgres_sqlx::Db;
 use serde::{Deserialize, Serialize};
 
 use entity_ref::EntityRef;

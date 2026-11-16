@@ -8,7 +8,7 @@ use argon2::{
     Argon2, PasswordHash, PasswordHasher, PasswordVerifier,
     password_hash::{Error, SaltString},
 };
-use rand::{Rng, RngCore, distr::Alphanumeric};
+use rand::{Rng, RngExt, distr::Alphanumeric};
 
 /// Hash `password` with a fresh random salt.
 ///

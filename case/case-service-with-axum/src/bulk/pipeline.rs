@@ -51,7 +51,7 @@
 //! The privileged [`MaskingProfile::Full`] profile leaves records
 //! unmasked and is gated at the handler.
 
-use axa::sqlx::Db;
+use axa::postgres_sqlx::Db;
 use case_matcher::{Case, MatchConfig, MatchingEngine};
 use sqlx::{PgConnection, PgPool};
 use uuid::Uuid;

@@ -1,7 +1,7 @@
 //! `bed_requests` — the demand queue the allocator serves (spec
 //! `domain-model.md`).
 
-use axa::sqlx::Db;
+use axa::postgres_sqlx::Db;
 use chrono::{DateTime, FixedOffset};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;

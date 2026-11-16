@@ -1538,7 +1538,7 @@ pub async fn count_persons(db: &PgPool) -> Result<u64> {
 ///
 /// Returns [`crate::Error::Database`] if the query fails.
 pub async fn person_ids_with_identifier(
-    conn: impl Into<axa::sqlx::Db<'_>>,
+    conn: impl Into<axa::postgres_sqlx::Db<'_>>,
     system: &str,
     value: &str,
 ) -> Result<Vec<Uuid>> {

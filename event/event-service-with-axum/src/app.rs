@@ -180,7 +180,7 @@ impl App {
 /// A failed migration, as axa's error. `MigrateError` has no `From` into
 /// it, so its message is carried instead.
 #[allow(clippy::needless_pass_by_value)]
-fn migrate_error(error: axa::sqlx::sqlx::migrate::MigrateError) -> Error {
+fn migrate_error(error: axa::postgres_sqlx::sqlx::migrate::MigrateError) -> Error {
     Error::Message(format!("migration: {error}"))
 }
 
@@ -228,7 +228,7 @@ impl App {
     /// Fails when a migration fails, or an applied one no longer matches
     /// its file.
     pub async fn migrate(ctx: &AppContext) -> Result<()> {
-        axa::sqlx::migrate(&ctx.db, &crate::db::MIGRATOR)
+        axa::postgres_sqlx::migrate(&ctx.db, &crate::db::MIGRATOR)
             .await
             .map_err(migrate_error)
     }
@@ -240,14 +240,14 @@ impl App {
         let migrator = &crate::db::MIGRATOR;
         match command {
             DbCommand::Migrate => Self::migrate(ctx).await?,
-            DbCommand::Down { steps } => axa::sqlx::revert(&ctx.db, migrator, steps)
+            DbCommand::Down { steps } => axa::postgres_sqlx::revert(&ctx.db, migrator, steps)
                 .await
                 .map_err(migrate_error)?,
-            DbCommand::Reset => axa::sqlx::dangerously_recreate(&ctx.db, migrator)
+            DbCommand::Reset => axa::postgres_sqlx::dangerously_recreate(&ctx.db, migrator)
                 .await
                 .map_err(migrate_error)?,
             DbCommand::Status => {
-                for migration in axa::sqlx::status(&ctx.db, migrator).await? {
+                for migration in axa::postgres_sqlx::status(&ctx.db, migrator).await? {
                     let state = if migration.applied {
                         "applied"
                     } else {

@@ -10,7 +10,7 @@
 //! retention sweep ([`scrub_addresses`]), the checkpoint reads, and the
 //! `integrity_resign` task's re-MAC.
 
-use axa::sqlx::Db;
+use axa::postgres_sqlx::Db;
 use serde_json::Value as JsonValue;
 use sqlx::PgPool;
 use uuid::Uuid;

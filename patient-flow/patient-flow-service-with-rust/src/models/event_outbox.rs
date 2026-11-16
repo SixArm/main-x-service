@@ -9,7 +9,7 @@
 //! Phase-3 relay's poll + ack (roadmap; the relay itself is not built
 //! yet).
 
-use axa::sqlx::Db;
+use axa::postgres_sqlx::Db;
 use chrono::{DateTime, FixedOffset};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;

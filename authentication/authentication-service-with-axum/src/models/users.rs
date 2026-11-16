@@ -268,7 +268,10 @@ impl Model {
     /// [`ModelError::Custom`] when validation fails, before anything is
     /// written; otherwise when the insert fails (a taken email or api key
     /// is a unique violation).
-    pub async fn insert(db: impl Into<axa::sqlx::Db<'_>>, new: NewUser<'_>) -> ModelResult<Self> {
+    pub async fn insert(
+        db: impl Into<axa::postgres_sqlx::Db<'_>>,
+        new: NewUser<'_>,
+    ) -> ModelResult<Self> {
         validate(new.name, new.email)?;
         let mut conn = db.into().acquire().await?;
         let user = sqlx::query_as!(
@@ -809,7 +812,7 @@ impl Model {
     ///
     /// # Errors
     /// - Returns an error if the database update fails.
-    pub async fn erase(self, db: impl Into<axa::sqlx::Db<'_>>) -> ModelResult<Model> {
+    pub async fn erase(self, db: impl Into<axa::postgres_sqlx::Db<'_>>) -> ModelResult<Model> {
         let mut conn = db.into().acquire().await?;
         let email = tombstone_email(&self.pid);
         validate(TOMBSTONE_NAME, &email)?;

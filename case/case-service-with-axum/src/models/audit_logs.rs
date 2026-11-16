@@ -11,7 +11,7 @@
 //! verification still succeeds, and [`Model::set_mac`], the
 //! `integrity_resign` task's re-MAC of a row whose MAC verified.
 
-use axa::sqlx::Db;
+use axa::postgres_sqlx::Db;
 use chrono::{DateTime, FixedOffset, SubsecRound as _};
 use serde::{Deserialize, Serialize};
 use sqlx::{PgConnection, PgPool};

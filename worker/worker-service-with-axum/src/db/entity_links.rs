@@ -16,7 +16,7 @@
 //! layer); the row handed back stores `time::Date`, which the code above
 //! `src/db/` expects, bridged via [`crate::db::convert`].
 
-use axa::sqlx::Db;
+use axa::postgres_sqlx::Db;
 use chrono::NaiveDate;
 use sqlx::PgPool;
 use time::OffsetDateTime;

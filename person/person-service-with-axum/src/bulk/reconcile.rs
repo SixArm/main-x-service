@@ -105,7 +105,7 @@ mod db_tests {
     /// The real queue, so these tests pin the table axa actually writes.
     async fn connect() -> (PgPool, Queue) {
         let db = PgPool::connect(&url()).await.expect("connect to DB_URL");
-        axa::sqlx::migrate(&db, &crate::db::MIGRATOR)
+        axa::postgres_sqlx::migrate(&db, &crate::db::MIGRATOR)
             .await
             .expect("run migrations");
         let queue = Queue::connect(&url(), QueueOptions::default())

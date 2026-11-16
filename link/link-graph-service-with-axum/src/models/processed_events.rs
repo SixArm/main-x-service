@@ -5,7 +5,7 @@
 //! read-model and calls [`Model::mark_processed`] after a successful
 //! apply.
 
-use axa::sqlx::Db;
+use axa::postgres_sqlx::Db;
 use chrono::{DateTime, FixedOffset, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;

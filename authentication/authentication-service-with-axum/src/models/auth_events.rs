@@ -266,7 +266,7 @@ impl Model {
     ///
     /// When the update fails.
     pub async fn scrub_subject_email(
-        db: impl Into<axa::sqlx::Db<'_>>,
+        db: impl Into<axa::postgres_sqlx::Db<'_>>,
         user_pid: Uuid,
         email: &str,
     ) -> ModelResult<u64> {

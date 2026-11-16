@@ -7,7 +7,7 @@
 //! by a `person:` URN. Every update writes only the columns it changes,
 //! keyed on `id`, and a row that has gone is `RowNotFound` (`500`).
 
-use axa::sqlx::Db;
+use axa::postgres_sqlx::Db;
 use chrono::{DateTime, FixedOffset, NaiveDate};
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;

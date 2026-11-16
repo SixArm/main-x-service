@@ -19,8 +19,8 @@
 //! conflict). Statuses are stored as the family's lowercase wire tokens
 //! (`pending` / `confirmed` / `rejected` / `automerged`).
 
+use axa::postgres_sqlx::Db;
 use axa::prelude::*;
-use axa::sqlx::Db;
 use chrono::{DateTime, Utc};
 use uuid::Uuid;
 

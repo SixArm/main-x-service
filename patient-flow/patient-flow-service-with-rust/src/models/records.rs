@@ -5,8 +5,8 @@
 //! The finders return the **axa** `Result` with `Error::NotFound` on a
 //! missing row, so every `GET /…/{pid}` contract is an honest 404.
 
+use axa::postgres_sqlx::Db;
 use axa::prelude::*;
-use axa::sqlx::Db;
 use uuid::Uuid;
 
 use super::{bays, bed_requests, beds, sites, stays, wards};

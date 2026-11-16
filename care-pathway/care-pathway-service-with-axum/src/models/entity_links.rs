@@ -11,7 +11,7 @@
 //! One persisted row is one **outbound** edge this service originates
 //! from a **pathway instance** (v1: `continues_as`).
 
-use axa::sqlx::Db;
+use axa::postgres_sqlx::Db;
 use chrono::{DateTime, FixedOffset, NaiveDate};
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;

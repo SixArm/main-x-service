@@ -9,7 +9,7 @@
 //! service's SQL in this directory. The schema itself is the plain SQL
 //! under `migrations/`, run by [`MIGRATOR`].
 //!
-//! A helper takes an [`axa::sqlx::Db`], so the caller passes either the
+//! A helper takes an [`axa::postgres_sqlx::Db`], so the caller passes either the
 //! pool or a connection it already holds (`&mut *conn`, or an open
 //! transaction). A helper that runs several statements takes one
 //! connection for the length of the call and passes it on.
@@ -26,7 +26,7 @@ pub mod suggestion_runs;
 /// The schema migrations: the plain SQL files under `migrations/`, one
 /// `<version>_<name>.up.sql` / `.down.sql` pair each, embedded at build
 /// time. `link-graph-service db migrate | down | reset | status` and the
-/// boot auto-migrate run these through `axa::sqlx`.
+/// boot auto-migrate run these through `axa::postgres_sqlx`.
 pub static MIGRATOR: sqlx::migrate::Migrator = sqlx::migrate!("./migrations");
 
 /// A model-layer failure.

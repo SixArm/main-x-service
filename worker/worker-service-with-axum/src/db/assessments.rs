@@ -18,7 +18,7 @@
 //! `500` with a message rather than taking the process down (security
 //! invariant 2: never panic on stored/untrusted input).
 
-use axa::sqlx::Db;
+use axa::postgres_sqlx::Db;
 use time::OffsetDateTime;
 use uuid::Uuid;
 

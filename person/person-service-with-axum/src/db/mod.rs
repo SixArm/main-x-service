@@ -44,7 +44,7 @@ pub use repositories::{AuditContext, PersonRepository, PgPersonRepository};
 /// The schema migrations: the plain SQL files under `migrations/`, one
 /// `<version>_<name>.up.sql` / `.down.sql` pair each, embedded at build
 /// time. `person-service db migrate | down | reset | status` and the boot
-/// auto-migrate run these through `axa::sqlx`.
+/// auto-migrate run these through `axa::postgres_sqlx`.
 pub static MIGRATOR: sqlx::migrate::Migrator = sqlx::migrate!("./migrations");
 
 /// Open a pooled `PostgreSQL` connection from the given configuration.

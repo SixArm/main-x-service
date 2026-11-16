@@ -7,7 +7,7 @@
 //! drive.
 
 use axa::cursor_pagination::escape_like;
-use axa::sqlx::Db;
+use axa::postgres_sqlx::Db;
 use case_matcher::Case as MatchCase;
 use chrono::{DateTime, FixedOffset, SubsecRound as _};
 use serde::{Deserialize, Serialize};

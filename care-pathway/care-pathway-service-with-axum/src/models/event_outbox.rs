@@ -3,7 +3,7 @@
 //!
 //! [`OutboxInsert::from_envelope`] is the **pure** envelope→row mapping
 //! (unit-testable DB-free). [`OutboxInsert::insert_on`] performs the
-//! in-transaction `INSERT` — it takes an [`axa::sqlx::Db`] so a request
+//! in-transaction `INSERT` — it takes an [`axa::postgres_sqlx::Db`] so a request
 //! handler can pass its own open transaction, giving the entity write and
 //! the event the same commit boundary. [`Model::recent`] projects the last
 //! N rows to the frozen operator [`EventView`] shape.
@@ -11,7 +11,7 @@
 //! [`Model::purge_published`] are the Phase-3 relay worker's poll, ack and
 //! retention sweep.
 
-use axa::sqlx::Db;
+use axa::postgres_sqlx::Db;
 use chrono::{DateTime, FixedOffset, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::{PgConnection, PgPool};

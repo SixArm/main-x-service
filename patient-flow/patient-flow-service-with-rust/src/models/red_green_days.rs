@@ -1,7 +1,7 @@
 //! `red_green_days` — one row per stay per calendar day: red/green
 //! classification + at most two coded delay reasons.
 
-use axa::sqlx::Db;
+use axa::postgres_sqlx::Db;
 use chrono::{DateTime, FixedOffset, NaiveDate};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;

@@ -4,7 +4,7 @@
 //! The full payload is stored verbatim in the `data` JSONB column; `pid`
 //! and `name` are denormalised for lookup and listing.
 
-use axa::sqlx::Db;
+use axa::postgres_sqlx::Db;
 use chrono::{DateTime, FixedOffset};
 use organization_matcher::Organization as MatchOrg;
 use serde::{Deserialize, Serialize};

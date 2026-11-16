@@ -1,7 +1,7 @@
 //! `wards` — a ward within a site; `kind` is `inpatient` /
 //! `assessment` / `virtual` (spec `domain-model.md`).
 
-use axa::sqlx::Db;
+use axa::postgres_sqlx::Db;
 use chrono::{DateTime, FixedOffset};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;

@@ -11,8 +11,8 @@
 //! lowercase wire tokens (`pending` / `confirmed` / `rejected` /
 //! `automerged`); the controller owns the enum mapping.
 
+use axa::postgres_sqlx::Db;
 use axa::prelude::*;
-use axa::sqlx::Db;
 use chrono::{DateTime, Utc};
 use uuid::Uuid;
 
