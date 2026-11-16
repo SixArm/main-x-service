@@ -5,6 +5,13 @@ read side of the hybrid topology. An axa backend service that
 consumes every entity's event stream and serves one queryable graph.
 **Read-only to the world**; all its writes are event-driven.
 
+## Specification Driven Development
+
+**The `spec/` directory is the source of truth.** 
+- Before doing anything read all files inside the `spec/` directory using your file-reading tools.
+- Treat all files inside `spec/` as strict requirements. Where any file disagrees with the spec, the spec wins: fix the file, or change the spec on purpose and bring the other files into line in the same commit. 
+- Do not improvise structure, style, or citation practice.
+
 ## Design docs are the source of truth (above this crate)
 
 This service **realises** two shared design docs. They sit above this

@@ -1,9 +1,11 @@
 # AGENTS — Course Service
 
-How to work in this crate. The canonical artefact is
-[`spec.md`](spec/index.md). When in doubt, the spec wins. See
-[`agents/spec-driven-development.md`](agents/spec-driven-development.md)
-for the discipline this crate practises.
+## Specification Driven Development
+
+**The `spec/` directory is the source of truth.** 
+- Before doing anything read all files inside the `spec/` directory using your file-reading tools.
+- Treat all files inside `spec/` as strict requirements. Where any file disagrees with the spec, the spec wins: fix the file, or change the spec on purpose and bring the other files into line in the same commit. 
+- Do not improvise structure, style, or citation practice.
 
 ## Crate-local docs (`agents/`)
 

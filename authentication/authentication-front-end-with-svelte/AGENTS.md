@@ -4,7 +4,12 @@ Entry point for AI coding agents (and humans) working in
 `authentication-front-end-with-svelte`: the operator UI for the
 [Authentication Service](../authentication-service-with-axum).
 
-> Read [`spec/index.md`](./spec/index.md) — the living spec — first.
+## Specification Driven Development
+
+**The `spec/` directory is the source of truth.** 
+- Before doing anything read all files inside the `spec/` directory using your file-reading tools.
+- Treat all files inside `spec/` as strict requirements. Where any file disagrees with the spec, the spec wins: fix the file, or change the spec on purpose and bring the other files into line in the same commit. 
+- Do not improvise structure, style, or citation practice.
 
 ## What this is
 

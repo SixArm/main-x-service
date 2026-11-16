@@ -6,15 +6,12 @@ this is the monorepo's GitHub Pages **subproject**. It lives here, inside
 sibling top-level read-only repository `SixArm/main-x-service.github.io`,
 which is what GitHub Pages actually serves.
 
-## Single source of truth
+## Specification Driven Development
 
-- Treat [`spec/index.md`](spec/index.md) as the single source of truth for
-  this site's scope and content model.
-- The **content** on this site (the family overview, architecture summary,
-  and the subproject table) is deliberately kept in sync with the root
-  [`AGENTS.md`](../AGENTS.md) and [`agents/share/`](../agents/share/) —
-  update both together rather than letting this site's copy drift into
-  its own story.
+**The `spec/` directory is the source of truth.** 
+- Before doing anything read all files inside the `spec/` directory using your file-reading tools.
+- Treat all files inside `spec/` as strict requirements. Where any file disagrees with the spec, the spec wins: fix the file, or change the spec on purpose and bring the other files into line in the same commit. 
+- Do not improvise structure, style, or citation practice.
 
 ## What this is
 

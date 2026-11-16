@@ -4,11 +4,12 @@ Entry point for AI coding agents (and humans) working in the
 `authentication-service` crate — the **central single sign-on provider**
 for the Main X Index family.
 
-> If you read one file, read [`spec/index.md`](./spec/index.md): the
-> living specification. This guide tells you **how to work**; the spec
-> tells you **what to build**.
+## Specification Driven Development
 
----
+**The `spec/` directory is the source of truth.** 
+- Before doing anything read all files inside the `spec/` directory using your file-reading tools.
+- Treat all files inside `spec/` as strict requirements. Where any file disagrees with the spec, the spec wins: fix the file, or change the spec on purpose and bring the other files into line in the same commit. 
+- Do not improvise structure, style, or citation practice.
 
 ## What this crate is
 

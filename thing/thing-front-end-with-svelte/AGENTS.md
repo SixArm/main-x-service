@@ -2,10 +2,12 @@
 
 Sibling to [`thing-service-with-axum/`](../thing-service-with-axum/). The Rust crate is the system of record; this is a thin presentation layer that calls its REST API.
 
-## Single source of truth
+## Specification Driven Development
 
-- The service's [`spec.md`](../thing-service-with-axum/spec/index.md) and [`agents/`](../thing-service-with-axum/agents/) describe the API contract. If a field disappears from `Thing` in the service, fix `src/lib/api/types.ts` here — do not let the front-end drift.
-- This project has its own [`spec.md`](spec/index.md) (§1–§18) for front-end-specific decisions: routes, components, design system, build.
+**The `spec/` directory is the source of truth.** 
+- Before doing anything read all files inside the `spec/` directory using your file-reading tools.
+- Treat all files inside `spec/` as strict requirements. Where any file disagrees with the spec, the spec wins: fix the file, or change the spec on purpose and bring the other files into line in the same commit. 
+- Do not improvise structure, style, or citation practice.
 
 ## Three-part change rule
 

@@ -2,11 +2,12 @@
 
 This file is the entry point for AI coding agents (Claude, Cursor, Aider, Devin, etc.) working in the `event-matcher` Rust crate. Humans are welcome too — these are the rules of the road regardless of who is at the keyboard.
 
-> **Navigating the docs:** [`index.md`](./index.md) is the top-level documentation index — start there if you don't know what to read first.
->
-> **Domain change in 0.5.0.** The crate was repurposed from geographic *place* matching to a schema.org/Event matcher. `spec.md` has been rewritten against the event surface and is authoritative again; the 0.4.x place behaviour survives only in the 0.5.0 CHANGELOG entry and the `0.4.x` releases.
+## Specification Driven Development
 
----
+**The `spec/` directory is the source of truth.** 
+- Before doing anything read all files inside the `spec/` directory using your file-reading tools.
+- Treat all files inside `spec/` as strict requirements. Where any file disagrees with the spec, the spec wins: fix the file, or change the spec on purpose and bring the other files into line in the same commit. 
+- Do not improvise structure, style, or citation practice.
 
 ## Quick orientation
 
