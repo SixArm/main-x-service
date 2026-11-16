@@ -146,7 +146,7 @@ s3 = ["dep:aws-config", "dep:aws-sdk-s3", "dep:aws-credential-types"]
 fluvio = ["dep:fluvio"]
 
 [dev-dependencies]
-axa-test = "0.2"
+axa-test = "0.3"
 # A local OIDC provider so tests/keycloak_guard.rs can push a Keycloak access
 # token through the real guard without a Keycloak container. Tests only.
 authentication-verifier = { path = "../../authentication/authentication-verifier-rust-crate", default-features = false, features = ["test-idp"] }
