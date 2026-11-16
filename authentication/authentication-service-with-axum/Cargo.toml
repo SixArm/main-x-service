@@ -114,7 +114,7 @@ path = "src/bin/main.rs"
 required-features = []
 
 [dev-dependencies]
-axa-test = "0.2"
+axa-test = "0.3"
 # The peer-side verifier library (local path — the monorepo's 0.2 PASETO
 # verifier, not the published 0.1). Used by tests/sign_verify_contract.rs
 # to pin the duplicated-by-convention Claims shape and footer-kid contract:
