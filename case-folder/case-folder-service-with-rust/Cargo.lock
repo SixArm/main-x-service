@@ -164,6 +164,30 @@ dependencies = [
  "async-trait",
  "axa-environment",
  "axa-problem",
+ "axum",
+ "clap",
+ "http-body-util",
+ "hyper",
+ "hyper-util",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "tokio",
+ "tower-http 0.7.1",
+ "tracing",
+ "tracing-subscriber",
+ "uuid",
+]
+
+[[package]]
+name = "axa"
+version = "0.12.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f5ba67c46f2c7b6958d31c6cf85750d4ed1625016af62a4222632724cf0ce34d"
+dependencies = [
+ "async-trait",
+ "axa-environment",
+ "axa-problem",
  "axa-request-rate-limit",
  "axum",
  "clap",
@@ -215,7 +239,7 @@ version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "31e4ddef189464f706dcec0a02daf9087f1bf6fbdcb27d070beeb347198fd89f"
 dependencies = [
- "axa",
+ "axa 0.11.0",
  "axum-test",
 ]
 
@@ -384,7 +408,7 @@ name = "case-folder-service-with-rust"
 version = "0.1.0"
 dependencies = [
  "async-trait",
- "axa",
+ "axa 0.12.1",
  "axa-test",
  "axum",
  "chrono",
