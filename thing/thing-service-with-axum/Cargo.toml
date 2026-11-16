@@ -114,7 +114,7 @@ keycloak = ["authentication-verifier/keycloak"]
 fluvio = ["dep:fluvio"]
 
 [dev-dependencies]
-axa-test = "0.2"
+axa-test = "0.3"
 axa = { version = "0.11", features = ["sqlx", "openapi", "opentelemetry", "versioning", "ratelimit", "cursor-pagination"] }
 # A local OIDC provider so tests/keycloak_guard.rs can push a Keycloak access
 # token through the real guard without a Keycloak container. Tests only.
