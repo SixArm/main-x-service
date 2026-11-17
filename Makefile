@@ -1,4 +1,4 @@
-.PHONY: github-pages ci ci-full test-minimum-supported-rust-version hooks hooks-off
+.PHONY: github-pages ci ci-full test-minimum-supported-rust-version test-coverage hooks hooks-off
 
 # Push the docs site subdirectory out to the github-pages remote via
 # git's subtree mechanism. See spec/monorepo-github-pages/index.md.
@@ -19,6 +19,12 @@ ci-full:
 # bin/make-test-minimum-supported-rust-version. Pass CRATES="path/to/crate ..." to narrow it.
 test-minimum-supported-rust-version:
 	bin/make-test-minimum-supported-rust-version $(CRATES)
+
+# Measure test coverage of the un-gated suite with cargo-tarpaulin, one
+# report per crate under target/tarpaulin/ (spec/testing §1.5). A report,
+# not a gate. Pass CRATES="path/to/crate ..." to narrow it.
+test-coverage:
+	bin/make-test-coverage $(CRATES)
 
 # Opt in to the pre-push hook (the fast tier under CI_LOCAL_BUDGET,
 # default 600 s); `make hooks-off` undoes it.

@@ -43,6 +43,7 @@ and most-frequently-run to most expensive:
 | **Request / integration tests** (gated) | `cargo test -- --ignored` | Yes (Postgres) | Full HTTP request/response cycles against a live database |
 | **Doc tests** (un-gated) | `cargo test --doc` | No | Public-API examples in `///` doc comments stay compilable and correct |
 | **Benchmarks** | `cargo bench` (Criterion) | No | Statistical performance of matching / search / validation hot paths |
+| **Coverage** | `make test-coverage` (`cargo tarpaulin`) | No | Which lines the un-gated suite reaches; a report, not a gate |
 
 The design intent: a contributor on a database-less laptop runs
 `cargo test` and gets a fully green, meaningful signal. The
@@ -128,6 +129,28 @@ public-API examples honest. Benchmarks use **Criterion** and live under
 `benches/` (`matching_bench`, `search_bench`, `validation_bench`); run
 all with `cargo bench`, or one suite with `cargo bench -- matching`.
 Benchmarks are not part of the pass/fail gate.
+
+Every crate with a `benches/` directory depends on the **`criterion`**
+crate (`0.8`, feature `html_reports`, plus `async_tokio` where a bench
+drives async code) as a dev-dependency, declares each bench with
+`harness = false`, and never uses the unstable `#[bench]` harness or a second
+benchmarking crate. The `bench` CI stage (`cargo bench --no-run`) proves they
+compile and link; reports land in `target/criterion/`.
+
+### 1.5 Test coverage
+
+Coverage is measured with **`cargo-tarpaulin`** (`cargo install
+cargo-tarpaulin`). `make test-coverage` runs `bin/make-test-coverage`, which
+runs `cargo tarpaulin` in every crate (or the crates named in
+`CRATES="path/to/crate ..."`) over the un-gated suite, so DB-gated tests
+stay skipped exactly as in `cargo test`. Each crate writes an HTML and an
+LCOV report to its own `target/tarpaulin/`. The script prints one
+`line coverage` figure per crate and a closing summary.
+
+Coverage is **a report, not a gate**: no threshold fails the build, because
+the DB-gated suites carry the compliance controls (§2) and are excluded
+here, so a percentage from the un-gated run understates them. Read it to
+find untested business logic, not to rank crates.
 
 ---
 

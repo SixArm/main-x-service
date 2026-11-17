@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+# Measure test coverage with cargo-tarpaulin (spec/testing §1.5).
+#
+# Runs `cargo tarpaulin` in every crate (or the crates named as arguments)
+# over the un-gated suite — DB-gated tests stay skipped, as in `cargo test` —
+# and writes an HTML and an LCOV report to <crate>/target/tarpaulin/. A
+# report, not a gate: it exits non-zero only when a crate's tests fail.
+#
+# Needs: cargo install cargo-tarpaulin
+set -uo pipefail
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "${ROOT}"
+
+if ! cargo tarpaulin --version >/dev/null 2>&1; then
+  echo "cargo-tarpaulin is not installed:  cargo install cargo-tarpaulin" >&2
+  exit 2
+fi
+
+if [[ $# -gt 0 ]]; then
+  crates=("$@")
+else
+  crates=()
+  while IFS= read -r line; do crates+=("$line"); done < <(scripts/ci-crates.sh)
+fi
+
+failed=0
+summary=()
+for crate in "${crates[@]}"; do
+  echo "==> ${crate}"
+  log="$(mktemp)"
+  if (cd "${crate}" && cargo tarpaulin --skip-clean --timeout 300 \
+        --out Html --out Lcov --output-dir target/tarpaulin) 2>&1 | tee "${log}"; then
+    figure="$(grep -E '^[0-9.]+% coverage' "${log}" | tail -1)"
+    summary+=("${crate}: ${figure:-no figure reported}")
+  else
+    summary+=("${crate}: FAILED")
+    failed=1
+  fi
+  rm -f "${log}"
+done
+
+echo
+echo "==> line coverage"
+printf '%s\n' "${summary[@]}"
+exit "${failed}"
