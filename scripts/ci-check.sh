@@ -434,15 +434,18 @@ run_stage() {
         echo "  ${crate}/Cargo.toml rust-version = ${declared}, but ci/msrv.txt says ${msrv}" >&2
         return 1
       fi
-      if ! rustup toolchain list 2>/dev/null | grep -q "^${msrv}"; then
-        echo "  Rust ${msrv} is not installed:" >&2
-        echo "    rustup toolchain install ${msrv} --profile minimal" >&2
+      # MSRV_TOOLCHAIN lets `make ci-msrv` compile on N-1 as well; the
+      # declared-version consistency check above is always against N-2.
+      local toolchain="${MSRV_TOOLCHAIN:-${msrv}}"
+      if ! rustup toolchain list 2>/dev/null | grep -q "^${toolchain}"; then
+        echo "  Rust ${toolchain} is not installed:" >&2
+        echo "    rustup toolchain install ${toolchain} --profile minimal" >&2
         return 1
       fi
       # `--all-targets` on purpose: benches and tests reach for APIs the
       # library does not, and an MSRV that only holds for src/ is not one
       # a consumer can rely on.
-      ( cd "${crate}" && cargo "+${msrv}" check --all-targets $(locked_flag "${crate}") )
+      ( cd "${crate}" && cargo "+${toolchain}" check --all-targets $(locked_flag "${crate}") )
       ;;
     *)
       echo "unknown stage: ${STAGE}" >&2
