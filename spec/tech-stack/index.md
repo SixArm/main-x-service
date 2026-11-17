@@ -56,7 +56,7 @@ family moved off SeaORM, which no crate uses since 2026-11-08.
 | String matching | strsim, fuzzy-matcher | Jaro-Winkler, Levenshtein |
 | Geo | geo, haversine | Coordinate distance (place / event matching) |
 | gRPC | Tonic 0.12 + Prost 0.13 | High-throughput RPC stub |
-| Timestamps | chrono 0.4 | Dates, times, durations |
+| Timestamps | jiff 1 (`jiff-sqlx` at the database boundary) | Dates, times, durations |
 | Error handling | thiserror 2 + anyhow 1 | Typed + contextual errors |
 | Password hashing | argon2 0.5 | Magic-link / credential hashing (where used) |
 | Authentication | rusty_paseto (PASETO v4.public) + authentication-verifier 0.9 | Server-side Postgres **cookie sessions** are the session; cross-service auth is short-lived **PASETO v4.public** tokens verified offline against the published Ed25519 key (`/.well-known/paseto-keys`). `jsonwebtoken`/RS256 + JWKS is **decommissioned**. See [`../../agents/share/authentication-sessions.md`](../../agents/share/authentication-sessions.md). |
@@ -92,8 +92,8 @@ ecosystem fragmentation across the ten entity slices.
 | Tokio | async_std | One async runtime across the family |
 | MiMalloc | jemalloc | Faster MUSL static builds |
 | PostgreSQL | SQLite | One production database; sqlx's `postgres` feature only |
-| chrono | jiff | One date/time crate at the database boundary: sqlx's `chrono` feature, which axa turns on |
-| sqlx `chrono` | sqlx `time` alongside it | With both on, sqlx 0.9.0's macros warn on every timestamp column |
+| jiff | chrono | One date/time crate. sqlx 0.9 has no `jiff` feature, so `jiff-sqlx` supplies the `timestamptz`/`date`/`time` mappings |
+| jiff | the `time` crate | Same reason: one date/time crate end to end |
 | Postgres-backed background jobs (the `axa_queue` table) | SQLite / external broker | No extra infra dependency for the job queue |
 
 ### 2.1 Known drift toward the target
@@ -104,7 +104,8 @@ to be closed, not as an alternative standard:
 
 | Crate | Deviation | Target |
 |---|---|---|
-| Older services (`person`, `worker`, `event`) | some wire and audit types are still the `time` crate, filled from `chrono` rows through crate-private twins in `src/db/` | one date/time crate end to end |
+| Every crate that uses `chrono` (333 source files at 2026-11-17) | `chrono` end to end, with sqlx's `chrono` feature, which axa may still turn on. `link-graph-service` declares `jiff` + `jiff-sqlx` as the pilot, not yet used | `jiff` types in code, mapped to Postgres through `jiff-sqlx`; remove `chrono` and sqlx's `chrono` feature once nothing needs them |
+| Older services (`person`, `worker`, `event`) | some wire and audit types are still the `time` crate, filled from `chrono` rows through crate-private twins in `src/db/` | one date/time crate end to end, which is now `jiff` |
 | Event streaming | default transport is still the in-memory publisher (`<ENTITY>_EVENT_TRANSPORT` defaults to `memory`); the durable Postgres outbox and the `FluvioSink` relay are implemented on all ten registries but opt-in, and only case's relay points at a live deployed broker today | flip the default, and point the remaining nine relays at a broker |
 
 Closed since this table was last drift-checked: Tantivy full-text search (was ILIKE/`pg_trgm`) is now live on all ten entity registries — see [`search/index.md`](../search/index.md).
@@ -249,9 +250,10 @@ about 34 normal dependencies (place 419 to 386, organization 382 to 348), and
 line counts stayed about even, because `query_as!` spells out the column lists
 that SeaORM's derives hid.
 
-Two things every crate on sqlx carries: timestamps map through sqlx's
-`chrono` feature, never `time` (with both on, sqlx 0.9.0's macros warn on
-every timestamp column), and `[profile.release.build-override] strip = false`,
+Two things every crate on sqlx carries: timestamps map through
+`jiff-sqlx` (a crate not yet migrated still uses sqlx's `chrono` feature,
+never `time`; with both on, sqlx 0.9.0's macros warn on every timestamp
+column), and `[profile.release.build-override] strip = false`,
 because macOS cannot load a stripped `sqlx-macros`.
 
 Every crate root (not its `fuzz/` sub-crate) also carries the same dev

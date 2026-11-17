@@ -21,7 +21,7 @@
 | **gRPC**             | Tonic                                             | High-performance RPC framework              |
 | **Protocols**        | Prost                                             | Protocol buffers                            |
 | **Environment**      | dotenvy                                           | Config env var                              |
-| **Timestamps**       | chrono                                              | Dates, times, durations                     |
+| **Timestamps**       | jiff, jiff-sqlx                                     | Dates, times, durations                     |
 | **Error Handling**   | thiserror, anyhow                                 | Typed and contextual error handling         |
 | **Security**         | argon2                                            | Password hashing                            |
 | **Authentication**   | rusty_paseto, authentication-verifier             | PASETO v4.public cross-service tokens (offline verification); cookie sessions for humans |
@@ -39,7 +39,7 @@ Constraints:
 - Tokio NOT async_std
 - MiMalloc NOT jemalloc
 - PostgreSQL NOT SQLite¹
-- chrono (axa requires it); sqlx's `chrono` feature only, never `time`
+- jiff, with `jiff-sqlx` at the database boundary; never `chrono` or `time` in new code (migration in progress, see `spec/tech-stack` §2.1)
 
 ¹ `axa` hardcoded `sqlx-sqlite` into every crate that used it. Now that
 axa is gone, this rule can be enforced by the dependency graph as well as by

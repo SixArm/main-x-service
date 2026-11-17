@@ -42,6 +42,8 @@ sqlx = { version = "0.9", default-features = false, features = ["postgres", "run
 # `serde` for the timestamps and dates the graph and audit endpoints
 # serialize.
 chrono = { version = "0.4", features = ["serde"] }
+jiff = "1"
+jiff-sqlx = { version = "1", features = ["postgres"] }
 uuid = { version = "1.29", features = ["v4", "serde"] }
 mimalloc = { version = "0.1.52" }
 prometheus = { version = "0.14" }
