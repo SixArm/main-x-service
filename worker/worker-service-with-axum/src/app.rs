@@ -286,6 +286,10 @@ impl App {
             .environment
             .as_deref()
             .map_or_else(Environment::from_env, Environment::parse);
+        // `health` asks the running server, so it too runs before anything connects.
+        if let Command::Health { ready, port } = &cli.command {
+            return axa::cli::health(&environment, &defaults(), *ready, *port).await;
+        }
         // `check` reads settings only, so it runs before anything connects.
         if matches!(cli.command, Command::Check) {
             return axa::cli::check(&environment, &defaults());
@@ -307,7 +311,7 @@ impl App {
             Self::migrate(&ctx).await?;
         }
         match cli.command {
-            Command::Check => Ok(()),
+            Command::Check | Command::Health { .. } => Ok(()),
             Command::Start { .. } => {
                 crate::compliance::address_retention::spawn(ctx.db.clone())?;
                 let router = Self::router(&ctx).await?;

@@ -31,6 +31,8 @@ fn http() -> Http {
         csp: None,
         permissions_policy: None,
         trusted_proxies: vec![],
+        cross_site_paths: vec![],
+        log_tenant: false,
     }
 }
 
