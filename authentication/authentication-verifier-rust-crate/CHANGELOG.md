@@ -10,6 +10,14 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.9.3] - 2026-11-17
+
+### Changed
+
+- **The `fetch` feature no longer pulls in `aws-lc-rs`.** `reqwest` now uses
+  `rustls-no-provider`, and the crate depends on `rustls` 0.23 with the `ring`
+  provider, so a consumer's graph holds one crypto provider and needs no C toolchain.
+
 ## [0.9.2] - 2026-11-06
 
 ### Security
