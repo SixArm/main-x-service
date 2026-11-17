@@ -27,7 +27,11 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 
 thiserror = "2"
-reqwest = { version = "0.13", default-features = false, features = ["json", "query", "rustls"] }
+reqwest = { version = "0.13", default-features = false, features = ["json", "query", "rustls-no-provider"] }
+# `rustls-no-provider` brings no crypto backend; `ring` is the family's (aws-lc-rs
+# is deliberately absent). With one provider feature enabled, rustls selects it
+# without an explicit install.
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
 # No crypto-backend feature: jsonwebtoken 10+ ships neither by
 # default, and its only two built-in options are `rust_crypto` (which
 # unconditionally bundles the `rsa` crate — RUSTSEC-2023-0071, the

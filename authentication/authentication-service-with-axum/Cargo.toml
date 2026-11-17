@@ -96,7 +96,7 @@ features = ["reqwest"]
 version = "0.13"
 optional = true
 default-features = false
-features = ["rustls", "json"]
+features = ["rustls-no-provider", "json"]
 
 [dependencies.url]
 version = "2"

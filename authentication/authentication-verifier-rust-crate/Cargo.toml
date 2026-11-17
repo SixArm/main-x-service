@@ -19,7 +19,7 @@ default = ["paseto"]
 # with `default-features = false` for a Keycloak-only deployment.
 paseto = ["dep:rusty_paseto", "dep:base64"]
 # Pull the PASETO public keys over HTTP at boot (`Verifier::from_paseto_keys_url`).
-fetch = ["paseto", "dep:reqwest"]
+fetch = ["paseto", "dep:reqwest", "dep:rustls"]
 # Verify Keycloak (OIDC) access tokens and map them onto `Claims`, via
 # `axum-keycloak-auth` (the engine `loco-keycloak-auth` wraps). Off by default.
 keycloak = ["dep:axum-keycloak-auth"]
@@ -35,9 +35,13 @@ thiserror = "2"
 base64 = { version = "0.23", optional = true }
 rusty_paseto = { version = "0.10.1", default-features = false, features = ["v4_public", "serde_json"], optional = true }
 reqwest = { version = "0.13", default-features = false, features = [
-  "rustls",
+  "rustls-no-provider",
   "json",
 ], optional = true }
+# reqwest's `rustls-no-provider` brings no crypto backend; `ring` is the one
+# this family uses (aws-lc-rs is deliberately absent). Having exactly one
+# provider feature enabled lets rustls pick it without an explicit install.
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"], optional = true }
 
 # Keycloak/OIDC access-token verification (feature `keycloak`). rustls, like
 # the rest of the family: no native-tls / OpenSSL.

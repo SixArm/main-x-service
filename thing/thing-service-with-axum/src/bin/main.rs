@@ -24,6 +24,10 @@ use thing_service::app::App;
 /// Returns the failure from [`App::run`].
 #[tokio::main]
 async fn main() -> axa::Result<()> {
+    // One crypto backend, explicitly: ring. Only a `fluvio` build has a second
+    // one (aws-lc-rs, forced by fluvio-future) compiled in to choose between.
+    #[cfg(feature = "fluvio")]
+    let _ = rustls::crypto::ring::default_provider().install_default();
     App::run(cli::parse(
         env!("CARGO_PKG_NAME"),
         env!("CARGO_PKG_VERSION"),

@@ -48,7 +48,7 @@ entity-ref = { path = "../../link/entity-ref-rust-crate" }
 # client is built non-redirecting so a peer cannot steer it elsewhere
 # (SEC-B11).
 reqwest = { version = "0.13", default-features = false, features = [
-  "rustls",
+  "rustls-no-provider",
   "json",
 ] }
 validator = { version = "0.21" }
@@ -105,14 +105,15 @@ csv = "1"
 aws-config = { version = "1", optional = true, default-features = false, features = [
   "behavior-version-latest",
   "rt-tokio",
-  "default-https-client",
 ] }
 aws-sdk-s3 = { version = "1", optional = true, default-features = false, features = [
   "behavior-version-latest",
   "rt-tokio",
-  "default-https-client",
   "sigv4a",
 ] }
+# The SDK's own `default-https-client` pulls in aws-lc-rs; instead the
+# client is built explicitly on rustls + ring (see `src/bulk/store.rs`).
+aws-smithy-http-client = { version = "1", optional = true, default-features = false, features = ["rustls-ring"] }
 aws-credential-types = { version = "1", optional = true }
 
 # Durable event bus Phase 3 (BUS-3; agents/share/event-bus.md §5/§8):
@@ -120,7 +121,15 @@ aws-credential-types = { version = "1", optional = true }
 # below so the default dependency tree (and every existing deployment's
 # build) is unchanged — the relay's `LoggingSink` covers dev/CI with no
 # broker at all.
-fluvio = { version = "0.50", optional = true }
+# fluvio's default `rustls-aws` feature selects aws-lc-rs; `rustls-ring` keeps
+# its TLS on the family's one crypto backend. (fluvio-future still enables
+# futures-rustls' own default aws-lc-rs feature unconditionally, so the
+# crate remains in a `--features fluvio` build; see `src/bin/main.rs`.)
+fluvio = { version = "0.50", optional = true, default-features = false, features = ["rustls", "compress", "rustls-ring"] }
+# The process-wide rustls provider, installed explicitly in `main` because a
+# `fluvio` build has both ring and aws-lc-rs compiled in and rustls will not
+# guess between them.
+rustls = { version = "0.23", optional = true, default-features = false, features = ["ring", "std", "tls12"] }
 
 [[bin]]
 name = "care-pathway-service"
@@ -139,11 +148,11 @@ keycloak = ["authentication-verifier/keycloak"]
 # S3-compatible artifact storage. Off by default: the local-filesystem
 # backend covers dev and test, and the SDK is a large dependency tree no
 # deployment should pay for unless it uses it.
-s3 = ["dep:aws-config", "dep:aws-sdk-s3", "dep:aws-credential-types"]
+s3 = ["dep:aws-config", "dep:aws-sdk-s3", "dep:aws-credential-types", "dep:aws-smithy-http-client"]
 # Off by default. The relay's `EventSink` seam (src/relay.rs) needs no
 # feature to build or test; only `FluvioSink` — the real-broker producer
 # — lives behind this.
-fluvio = ["dep:fluvio"]
+fluvio = ["dep:fluvio", "dep:rustls"]
 
 [dev-dependencies]
 axa-test = "0.3"

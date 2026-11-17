@@ -492,7 +492,16 @@ impl S3ArtifactStore {
             .filter(|s| !s.trim().is_empty())
             .unwrap_or_else(|| "us-east-1".to_string());
 
+        // rustls on ring, never aws-lc-rs (this family has one crypto
+        // backend); the SDK's own default client would pull in aws-lc-rs.
+        let http_client = aws_smithy_http_client::Builder::new()
+            .tls_provider(aws_smithy_http_client::tls::Provider::Rustls(
+                aws_smithy_http_client::tls::rustls_provider::CryptoMode::Ring,
+            ))
+            .build_https();
+
         let shared = aws_config::defaults(aws_config::BehaviorVersion::latest())
+            .http_client(http_client)
             .region(aws_config::Region::new(region))
             .load()
             .await;

@@ -290,6 +290,7 @@ dependencies = [
  "base64 0.23.1",
  "jsonwebtoken",
  "reqwest 0.13.5",
+ "rustls",
  "rusty_paseto",
  "serde",
  "serde_json",
@@ -610,7 +611,6 @@ checksum = "5bc688673e282f42d3152dcd9cacc1a9a75734d7cd39d02e58989276fc750f3c"
 dependencies = [
  "aws-smithy-async",
  "aws-smithy-http",
- "aws-smithy-http-client",
  "aws-smithy-observability",
  "aws-smithy-runtime-api",
  "aws-smithy-schema",
@@ -1192,6 +1192,7 @@ dependencies = [
  "aws-config",
  "aws-credential-types",
  "aws-sdk-s3",
+ "aws-smithy-http-client",
  "axa",
  "axa-test",
  "axum",
@@ -1214,6 +1215,7 @@ dependencies = [
  "regex",
  "reqwest 0.13.5",
  "rstest",
+ "rustls",
  "rusty_paseto",
  "serde",
  "serde_json",
@@ -4602,7 +4604,6 @@ version = "0.11.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0e750cca55fe4f0439a15d0bb529da9651e79993e8e72c61a899a36d462befbe"
 dependencies = [
- "aws-lc-rs",
  "bytes",
  "getrandom 0.4.3",
  "lru-slab",
@@ -4884,7 +4885,6 @@ dependencies = [
  "log",
  "percent-encoding",
  "pin-project-lite",
- "quinn",
  "rustls",
  "rustls-pki-types",
  "rustls-platform-verifier",

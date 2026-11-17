@@ -42,7 +42,7 @@ prometheus = { version = "0.14" }
 # Upstream display-name lookups (`http` client mode only; stub is the
 # default). Same minimal reqwest configuration as the verifier's fetch.
 reqwest = { version = "0.13", default-features = false, features = [
-  "rustls",
+  "rustls-no-provider",
   "json",
 ] }
 

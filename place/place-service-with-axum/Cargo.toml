@@ -100,7 +100,15 @@ mimalloc = "0.1.52"
 # sink. Optional and behind the `fluvio` feature below so the default
 # dependency tree (and every existing deployment's build) is unchanged —
 # the relay's `LoggingSink` covers dev/CI with no broker at all.
-fluvio = { version = "0.50", optional = true }
+# fluvio's default `rustls-aws` feature selects aws-lc-rs; `rustls-ring` keeps
+# its TLS on the family's one crypto backend. (fluvio-future still enables
+# futures-rustls' own default aws-lc-rs feature unconditionally, so the
+# crate remains in a `--features fluvio` build; see `src/bin/main.rs`.)
+fluvio = { version = "0.50", optional = true, default-features = false, features = ["rustls", "compress", "rustls-ring"] }
+# The process-wide rustls provider, installed explicitly in `main` because a
+# `fluvio` build has both ring and aws-lc-rs compiled in and rustls will not
+# guess between them.
+rustls = { version = "0.23", optional = true, default-features = false, features = ["ring", "std", "tls12"] }
 
 [features]
 # PASETO bearer verification (the family default): `Verifier`, the boot key
@@ -114,7 +122,7 @@ keycloak = ["authentication-verifier/keycloak"]
 # Off by default. The relay's `EventSink` seam (src/relay.rs) needs no
 # feature to build or test; only `FluvioSink` — the real-broker producer
 # — lives behind this.
-fluvio = ["dep:fluvio"]
+fluvio = ["dep:fluvio", "dep:rustls"]
 
 [dev-dependencies]
 axa-test = "0.3"
@@ -178,7 +186,7 @@ tokio-stream = { version = "0.1", features = ["net"] }
 # `tests/otlp_export.rs` makes a real HTTP request against a served
 # router.
 reqwest = { version = "0.13", default-features = false, features = [
-  "rustls",
+  "rustls-no-provider",
   "json",
 ] }
 
