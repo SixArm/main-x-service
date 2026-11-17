@@ -434,7 +434,7 @@ run_stage() {
         echo "  ${crate}/Cargo.toml rust-version = ${declared}, but ci/msrv.txt says ${msrv}" >&2
         return 1
       fi
-      # MSRV_TOOLCHAIN lets `make ci-minimum-supported-rust-version` compile on N-1 as well; the
+      # MSRV_TOOLCHAIN lets `make test-minimum-supported-rust-version` compile on N-1 as well; the
       # declared-version consistency check above is always against N-2.
       local toolchain="${MSRV_TOOLCHAIN:-${msrv}}"
       if ! rustup toolchain list 2>/dev/null | grep -q "^${toolchain}"; then
