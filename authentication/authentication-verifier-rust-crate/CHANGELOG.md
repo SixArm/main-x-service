@@ -10,6 +10,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.9.4] - 2026-11-17
+
 ### Fixed
 
 - `Verifier::from_paseto_keys_url` installs the `ring` rustls provider as the process default before it builds its client. reqwest's `rustls-no-provider` panics without one, which broke every key fetch after the aws-lc-rs removal.
