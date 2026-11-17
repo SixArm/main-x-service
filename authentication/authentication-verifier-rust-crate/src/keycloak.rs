@@ -146,15 +146,13 @@ pub fn settings_from_lookup(
     };
     let realm = var("REALM")
         .ok_or_else(|| VerifyError::Keycloak(format!("{prefix}_KEYCLOAK_REALM is not set")))?;
-    let audiences: Vec<String> = var("AUDIENCES")
-        .map(|v| {
-            v.split(',')
-                .map(str::trim)
-                .filter(|a| !a.is_empty())
-                .map(str::to_string)
-                .collect()
-        })
-        .unwrap_or_default();
+    let audiences: Vec<String> = var("AUDIENCES").map_or_default(|v| {
+        v.split(',')
+            .map(str::trim)
+            .filter(|a| !a.is_empty())
+            .map(str::to_string)
+            .collect()
+    });
     let role_map_json = match var("ROLE_MAP_FILE") {
         Some(path) => Some(std::fs::read_to_string(&path).map_err(|e| {
             VerifyError::Keycloak(format!("{prefix}_KEYCLOAK_ROLE_MAP_FILE {path:?}: {e}"))
