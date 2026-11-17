@@ -83,8 +83,7 @@ impl OidcConfig {
             .filter(|v| !v.is_empty())?;
         let claim_map = claim_map_from_env().unwrap_or_default();
         let jit_provisioning = std::env::var(JIT_PROVISIONING_ENV)
-            .ok()
-            .is_some_and(|v| v == "1" || v.eq_ignore_ascii_case("true"));
+            .is_ok_and(|v| v == "1" || v.eq_ignore_ascii_case("true"));
         Some(Self {
             issuer_url,
             client_id,

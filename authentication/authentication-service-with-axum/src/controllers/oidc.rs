@@ -107,6 +107,9 @@ fn forbidden_oidc(message: &str) -> Error {
 fn http_client() -> &'static openidconnect::reqwest::Client {
     static CLIENT: OnceLock<openidconnect::reqwest::Client> = OnceLock::new();
     CLIENT.get_or_init(|| {
+        // Building a client panics with no process-default provider; an `Err`
+        // only means one is already installed.
+        let _ = rustls::crypto::ring::default_provider().install_default();
         openidconnect::reqwest::ClientBuilder::new()
             .redirect(openidconnect::reqwest::redirect::Policy::none())
             .timeout(Duration::from_secs(10))

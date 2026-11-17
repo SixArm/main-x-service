@@ -84,13 +84,21 @@ paseto = ["dep:rusty_paseto", "dep:ed25519-dalek"]
 # deployment that does not federate pulls in no extra HTTP/crypto
 # stack — the same posture `authentication-verifier`'s own `fetch`
 # feature takes for its boot-time key-set fetch.
-oidc = ["dep:openidconnect", "dep:reqwest", "dep:url"]
+oidc = ["dep:openidconnect", "dep:reqwest", "dep:rustls", "dep:url"]
 
 [dependencies.openidconnect]
 version = "4"
 optional = true
 default-features = false
 features = ["reqwest"]
+
+# reqwest's `rustls-no-provider` builds no crypto backend and panics without a
+# process-default provider; `ring` is the family's one (see `http_client`).
+[dependencies.rustls]
+version = "0.23"
+optional = true
+default-features = false
+features = ["ring", "std", "tls12"]
 
 [dependencies.reqwest]
 version = "0.13"

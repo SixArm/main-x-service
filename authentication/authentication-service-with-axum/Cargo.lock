@@ -186,6 +186,7 @@ dependencies = [
  "regex",
  "reqwest 0.13.5",
  "rstest",
+ "rustls",
  "rusty_paseto",
  "serde",
  "serde_json",
