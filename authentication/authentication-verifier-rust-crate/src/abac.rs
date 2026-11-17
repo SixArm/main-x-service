@@ -284,14 +284,12 @@ fn values_for<'a>(
     if let Some(name) = key.strip_prefix("resource.") {
         return resource
             .get(name)
-            .map(|values| values.iter().map(String::as_str).collect())
-            .unwrap_or_default();
+            .map_or_default(|values| values.iter().map(String::as_str).collect());
     }
     if let Some(name) = key.strip_prefix("env.") {
         return env
             .get(name)
-            .map(|values| values.iter().map(String::as_str).collect())
-            .unwrap_or_default();
+            .map_or_default(|values| values.iter().map(String::as_str).collect());
     }
     match key {
         "sub" => vec![claims.sub.as_str()],
@@ -300,8 +298,7 @@ fn values_for<'a>(
         _ => claims
             .attrs
             .get(key)
-            .map(|values| values.iter().map(String::as_str).collect())
-            .unwrap_or_default(),
+            .map_or_default(|values| values.iter().map(String::as_str).collect()),
     }
 }
 
