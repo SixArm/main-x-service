@@ -104,7 +104,7 @@ to be closed, not as an alternative standard:
 
 | Crate | Deviation | Target |
 |---|---|---|
-| Every crate that uses `chrono` (333 source files at 2026-11-17) | `chrono` end to end, with sqlx's `chrono` feature, which axa may still turn on. `link-graph-service` declares `jiff` + `jiff-sqlx` as the pilot, not yet used | `jiff` types in code, mapped to Postgres through `jiff-sqlx`; remove `chrono` and sqlx's `chrono` feature once nothing needs them |
+| Every crate that uses `chrono` (333 source files at 2026-11-17) | `chrono` end to end, with sqlx's `chrono` feature, which axa may still turn on. `link-graph-service` is the pilot: its `consumer_offsets` model, the freshness/`as_of` responses and the freshness metric use `jiff` + `jiff-sqlx`; its other models still use chrono | `jiff` types in code, mapped to Postgres through `jiff-sqlx`; remove `chrono` and sqlx's `chrono` feature once nothing needs them |
 | Older services (`person`, `worker`, `event`) | some wire and audit types are still the `time` crate, filled from `chrono` rows through crate-private twins in `src/db/` | one date/time crate end to end, which is now `jiff` |
 | Event streaming | default transport is still the in-memory publisher (`<ENTITY>_EVENT_TRANSPORT` defaults to `memory`); the durable Postgres outbox and the `FluvioSink` relay are implemented on all ten registries but opt-in, and only case's relay points at a live deployed broker today | flip the default, and point the remaining nine relays at a broker |
 

@@ -12,7 +12,6 @@ use axa::prelude::*;
 use axum::http::header::CONTENT_TYPE;
 use axum::http::{HeaderValue, StatusCode};
 use axum::response::IntoResponse;
-use chrono::Utc;
 
 use crate::events::entity_from_topic;
 use crate::metrics::{self, Metrics};

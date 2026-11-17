@@ -41,7 +41,9 @@ impl Model {
                      last_occurred_at = excluded.last_occurred_at",
             topic,
             offset,
-            occurred_at.to_sqlx(),
+            // The cast is sqlx's per-argument type override: its `chrono`
+            // feature would otherwise expect a chrono type for `timestamptz`.
+            occurred_at.to_sqlx() as jiff_sqlx::Timestamp,
         )
         .execute(&mut *conn)
         .await?;
@@ -53,9 +55,7 @@ impl Model {
     /// # Errors
     ///
     /// When the query fails.
-    pub async fn freshness(
-        db: impl Into<Db<'_>>,
-    ) -> ModelResult<Vec<(String, Timestamp)>> {
+    pub async fn freshness(db: impl Into<Db<'_>>) -> ModelResult<Vec<(String, Timestamp)>> {
         let mut conn = db.into().acquire().await?;
         let rows = sqlx::query_as!(
             Self,
