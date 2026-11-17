@@ -52,6 +52,8 @@
 // `warn(clippy::pedantic)` — opt into Clippy's stricter lint set so the
 // crate stays idiomatic; warnings (not errors) keep iteration friction low.
 #![warn(clippy::pedantic)]
+// `assert!(x.is_empty())` reads better than `assert_eq!(x, [] as [T; 0])`.
+#![allow(clippy::assert_is_empty)]
 
 // ── Module tree ──────────────────────────────────────────────────
 // Each module owns one concern; `lib.rs` only declares them and curates

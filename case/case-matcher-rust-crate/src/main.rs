@@ -4,6 +4,8 @@
 #![forbid(unsafe_code)] // demo binary needs no `unsafe` either.
 #![deny(missing_docs)]
 #![warn(clippy::pedantic)]
+// `assert!(x.is_empty())` reads better than `assert_eq!(x, [] as [T; 0])`.
+#![allow(clippy::assert_is_empty)]
 
 /// Use mimalloc as the global allocator on MUSL static builds, where it
 /// noticeably outperforms the default allocator. Gated to `musl` so glibc

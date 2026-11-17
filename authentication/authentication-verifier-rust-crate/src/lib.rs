@@ -89,6 +89,8 @@
 #![forbid(unsafe_code)]
 // Opt into clippy's pedantic lints to keep the public-facing library tidy.
 #![warn(clippy::pedantic)]
+// `assert!(x.is_empty())` reads better than `assert_eq!(x, [] as [T; 0])`.
+#![allow(clippy::assert_is_empty)]
 // A published library must document every public item; fail the build if
 // any item lacks a doc comment.
 #![deny(missing_docs)]
