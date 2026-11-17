@@ -150,3 +150,22 @@ base64 = { version = "0.23" }
 # host-side build tools are affected; the shipped binary is unchanged.
 [profile.release.build-override]
 strip = false
+
+# Faster dev builds: line tables are enough for backtraces and panics, and
+# dependencies carry no debug info at all.
+[profile.dev]
+debug = "line-tables-only"
+split-debuginfo = "unpacked"
+
+[profile.dev.package."*"]
+debug = false
+# Without this, cargo strips debug info from proc-macro dylibs (sqlx-macros),
+# and macOS then refuses to load them.
+strip = "none"
+
+# cargo-mutants builds every mutant once in a throwaway copy of the tree: no debug information and no
+# incremental state make each build quicker and smaller. `.cargo/mutants.toml` selects it.
+[profile.mutants]
+inherits = "test"
+debug = "none"
+incremental = false

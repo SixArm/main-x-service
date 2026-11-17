@@ -254,6 +254,15 @@ Two things every crate on sqlx carries: timestamps map through sqlx's
 every timestamp column), and `[profile.release.build-override] strip = false`,
 because macOS cannot load a stripped `sqlx-macros`.
 
+Every crate root (not its `fuzz/` sub-crate) also carries the same dev
+profile, for faster builds and smaller `target/` directories:
+`[profile.dev]` with `debug = "line-tables-only"` and
+`split-debuginfo = "unpacked"`, and `[profile.dev.package."*"]` with
+`debug = false` and `strip = "none"`. The `strip` line is required, not
+cosmetic: with dependency debug info off, cargo strips `sqlx-macros` and macOS
+then cannot load it. Line tables keep backtraces and panic locations;
+dependencies get no debug info at all.
+
 ---
 
 ## 6. Versioning, edition, and MSRV
