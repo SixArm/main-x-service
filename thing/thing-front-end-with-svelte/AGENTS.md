@@ -45,7 +45,7 @@ Per repo decision (2026-06-02), each `*-front-end-with-svelte` project keeps its
 ## Authentication — BFF pattern (implemented)
 
 This front-end runs its own SvelteKit server as a **Backend-For-Frontend**,
-per [`agents/share/authentication-sessions.md`](../../../agents/share/authentication-sessions.md)
+per [`agents/share/authentication-sessions.md`](../../agents/share/authentication-sessions.md)
 §6. The browser holds only the httpOnly `__Host-mxi_session` cookie and
 never sees a token or calls the Thing Service directly:
 

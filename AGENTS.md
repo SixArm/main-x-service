@@ -21,7 +21,7 @@ Two spec shapes exist, and they are different on purpose:
 | Shape | Used by | Layout | Live task queue |
 |---|---|---|---|
 | **Numbered** | entity service crates, matcher crates, front-end projects | `spec/01-purpose-and-vision.md` … (§1–§18 for service/front-end crates; matcher crates vary¹) | §13 |
-| **Topic-named** | the five consumer applications | `spec/<topic>.md` plus the SDD trio `requirements.md` / `design.md` / `tasks.md` | `spec/tasks.md` |
+| **Topic-named** | the consumer applications | `spec/<topic>.md` plus the SDD trio `requirements.md` / `design.md` / `tasks.md` | `spec/tasks.md` |
 
 The numbered shape suits a crate with one entity and a fixed set of
 concerns; the topic shape suits an application whose modules are the
@@ -136,9 +136,6 @@ front-end) and are not part of the entity trio tables above.
 |---|---|---|
 | [case-folder](case-folder/spec/index.md) | NHS paper case-note folder location tracking — "where is the folder for NHS Number X right now?", with a barcode/QR/RFID move audit trail. | [service](case-folder/case-folder-service-with-rust/spec/index.md) · [front-end](case-folder/case-folder-front-end-with-svelte/spec/index.md) |
 | [patient-flow](patient-flow/spec/index.md) | NHS hospital patient flow and bed management — live bed state, ward whiteboards, the SAFER/Red2Green inpatient journey, rule-checked allocation, capacity at a glance. Owns operational state; references person / worker / place / organization by `EntityRef`. | [service](patient-flow/patient-flow-service-with-rust/spec/index.md) · [front-end](patient-flow/patient-flow-front-end-with-svelte/spec/index.md) |
-| [workforce-planning-management](workforce-planning-management/spec/index.md) | All-in-one HR across the employee lifecycle — talent acquisition, workforce management, HR service delivery, talent development, payroll and compensation. Owns the employment relationship; references person / worker / organization / course. | [service](workforce-planning-management/workforce-planning-management-service-with-rust/spec/index.md) · [front-end](workforce-planning-management/workforce-planning-management-front-end-with-svelte/spec/index.md) |
-| [contact-relationship-management](contact-relationship-management/spec/index.md) | Customer and prospect relationships — sales automation, consent-first marketing, service and support, derived analytics. Owns relationship state; identity dedup stays upstream. Distinct from the governmental `case` registry. | [service](contact-relationship-management/contact-relationship-management-service-with-rust/spec/index.md) · [front-end](contact-relationship-management/contact-relationship-management-front-end-with-svelte/spec/index.md) |
-| [content-management-system](content-management-system/spec/index.md) | Headless content management — content modelling and authoring (block documents, not stored HTML), digital assets, the editorial lifecycle, localization, delivery and SEO, and derived content insights. Owns content and editorial state; readers are not modelled at all. | [service](content-management-system/content-management-system-service-with-rust/spec/index.md) · [front-end](content-management-system/content-management-system-front-end-with-svelte/spec/index.md) |
 
 Delivery status for each lives in its own `spec/tasks.md`, which is the
 single source of truth — repeating it here is how the two drift.
@@ -159,6 +156,12 @@ front-end) was extracted with full history into its own repository,
 [https://github.com/project-portfolio-management/project-portfolio-management](https://github.com/project-portfolio-management/project-portfolio-management), and is no longer
 in this monorepo. It still consumes `authentication-verifier` and
 `integrity-mac` from here via pinned git dependencies.
+
+`workforce-planning-management`, `contact-relationship-management` and
+`content-management-system` (each a service plus front-end consumer
+application) were likewise lifted out of this monorepo into their own
+repositories (see the git history), so their rows are no longer in the
+consumer-applications table above.
 
 ### GitHub Pages
 

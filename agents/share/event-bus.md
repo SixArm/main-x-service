@@ -322,7 +322,7 @@ own offset.
 
 A **best-effort notification** fan-out to operator-configured third-party
 URLs, alongside (not instead of) the durable-bus sinks above (repo
-`tasks.md` EV-3). [project-portfolio-management-service](../../project-portfolio-management/project-portfolio-management-service-with-loco)
+`tasks.md` EV-3). [project-portfolio-management-service](https://github.com/project-portfolio-management/project-portfolio-management/tree/main/project-portfolio-management-service-with-rust)
 is the first adopter (`src/webhooks.rs`, its own `spec/13-tasks.md`
 T-28m); other registries copy this shape when a consumer asks for it —
 the contract below is family-shaped, not portfolio-specific.

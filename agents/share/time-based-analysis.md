@@ -7,7 +7,7 @@ conventions, the anti-gaming properties, and the per-entity adoption, so
 each crate adopts it without re-litigating.
 
 It exists because two subprojects — [care-pathway](../../care-pathway/spec/time-based-analysis.md)
-(a patient journey) and [project-portfolio-management](../../project-portfolio-management/spec/time-based-analysis.md)
+(a patient journey) and [project-portfolio-management](https://github.com/project-portfolio-management/project-portfolio-management/tree/main/spec/time-based-analysis.md)
 (a delivery board) — implemented the same measurement model
 independently, and the second one found errors in the first one's
 reasoning. A third adopter should inherit the corrections rather than
@@ -510,4 +510,4 @@ because both track a unit through states over time.
 - Little, J. D. C. — *A Proof for the Queuing Formula L = λW*.
 - Reinertsen, D. — *The Principles of Product Development Flow*.
 - [NHS England — RTT](https://www.england.nhs.uk/rtt/) · [cancer standards](https://www.england.nhs.uk/clinically-led-review-nhs-access-standards/cancer/).
-- Per-subproject specs: [care-pathway](../../care-pathway/spec/time-based-analysis.md) · [portfolio](../../project-portfolio-management/spec/time-based-analysis.md).
+- Per-subproject specs: [care-pathway](../../care-pathway/spec/time-based-analysis.md) · [portfolio](https://github.com/project-portfolio-management/project-portfolio-management/tree/main/spec/time-based-analysis.md).

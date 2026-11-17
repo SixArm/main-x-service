@@ -1046,7 +1046,7 @@ predating the column verify as `unhashed` rather than as mismatches, and
 are rehashed on their next write.
 
 **Keyed integrity MAC** ([`src/compliance/mac.rs`](../src/compliance/mac.rs),
-embedding the shared [`integrity-mac`](../../../integrity/integrity-mac-rust-crate/index.md)
+embedding the shared [`integrity-mac`](../../../integrity/integrity-mac-rust-crate/README.md)
 crate). A SHA-256 digest alone proves nothing against an attacker with
 database write access — its format is published, so a forged row can
 carry a matching hash. `CARE_PATHWAY_INTEGRITY_MAC_KEY` (or
@@ -1980,7 +1980,7 @@ the evidence bundle.
   (§12.1).** A SHA-256 digest alone is forgeable by anyone with database
   write access, since its format is published; this closes that. New
   `src/compliance/mac.rs` embeds the shared
-  [`integrity-mac`](../../../integrity/integrity-mac-rust-crate/index.md)
+  [`integrity-mac`](../../../integrity/integrity-mac-rust-crate/README.md)
   crate: `CARE_PATHWAY_INTEGRITY_MAC_KEY` (or `_KEY_FILE`, which wins) +
   HKDF-derived per-domain subkeys (`audit-chain` / `record` /
   `checkpoint`) so a tag from one domain can never verify as another; no

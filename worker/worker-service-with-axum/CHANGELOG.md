@@ -822,7 +822,7 @@ against a worker (spec §5.5 / §6.9 / §9.2 / §10.5, task T-10).
 - Worker now originates the **`same_identity`** cross-service edge
   (worker → person, the inverse direction of person's person → worker),
   mirroring the person reference
-  ([cross-service-linking.md](../../../agents/share/cross-service-linking.md)
+  ([cross-service-linking.md](../../agents/share/cross-service-linking.md)
   §4.1/§4.2). New `entity_links` table (migration
   `2026071000000001_create_entity_links`, idempotent upsert on
   `(from_pid, kind, to_ref, valid_from) NULLS NOT DISTINCT`), persistence
@@ -889,7 +889,7 @@ against a worker (spec §5.5 / §6.9 / §9.2 / §10.5, task T-10).
 - REST URLs are now version-free (`/api/workers`, not `/api/v1/workers`).
   API versioning is selected with the `Accepts-version` request header
   (default `1.0`), per
-  [`agents/share/api-versioning.md`](../../../agents/share/api-versioning.md).
+  [`agents/share/api-versioning.md`](../../agents/share/api-versioning.md).
   New `src/api/rest/version.rs` (`require_version_mw`) negotiates the
   version on `/api/*` (unsupported explicit version ⇒ `406`; resolved
   version echoed on the response), layered next to the auth guard on both

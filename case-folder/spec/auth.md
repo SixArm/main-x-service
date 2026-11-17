@@ -7,7 +7,7 @@
 Authentication is **passwordless email magic link**. The **sign-in
 (magic) token is a short-lived signed JWT**; the **session is an opaque
 server-side session id** (not a JWT) held in the HttpOnly `cts_session`
-cookie — per [`agents/share/jwt.md`](../agents/share/jwt.md) ("JWTs must
+cookie — per [`agents/share/jwt.md`](../../agents/share/jwt.md) ("JWTs must
 not be used to keep users logged in"). Identity still comes from the
 configured allowlist (no *user* table). The session store is **in-process
 today** (an upgrade from the previous JWT-in-cookie session); a **durable
