@@ -1,4 +1,6 @@
 #![warn(clippy::pedantic)]
+// `assert!(x.is_empty())` reads better than `assert_eq!(x, [] as [T; 0])`.
+#![allow(clippy::assert_is_empty)]
 
 //! A merge of a duplicate holding an identifier succeeds, and the survivor
 //! holds the identifier afterwards. `person_identifiers` is unique on

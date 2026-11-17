@@ -309,8 +309,7 @@ fn build_doc(event: &Event, s: &EventIndexSchema) -> tantivy::TantivyDocument {
     let start_date = event.start_date.format("%Y-%m-%d").to_string();
     let end_date = event
         .end_date
-        .map(|d| d.format("%Y-%m-%d").to_string())
-        .unwrap_or_default();
+        .map_or_default(|d| d.format("%Y-%m-%d").to_string());
     let description = event.description.clone().unwrap_or_default();
 
     doc!(

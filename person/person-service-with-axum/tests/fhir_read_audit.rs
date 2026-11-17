@@ -1,4 +1,6 @@
 #![warn(clippy::pedantic)]
+// `assert!(x.is_empty())` reads better than `assert_eq!(x, [] as [T; 0])`.
+#![allow(clippy::assert_is_empty)]
 
 //! FHIR reads are audited as REST reads are (HIPAA §164.312(b): reads are
 //! activity). With `PERSON_AUDIT_READS` on, `GET /fhir/Patient/{id}` and the

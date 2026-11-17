@@ -213,8 +213,7 @@ impl SearchEngine {
                 s.care_setting => pathway
                     .care_setting
                     .as_ref()
-                    .map(|c| format!("{c:?}").to_lowercase())
-                    .unwrap_or_default(),
+                    .map_or_default(|c| format!("{c:?}").to_lowercase()),
                 s.active => "true",
             ))
             .map_err(|e| err(&format!("add document: {e}")))?;

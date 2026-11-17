@@ -216,13 +216,11 @@ impl SearchEngine {
                 s.case_type => case
                     .case_type
                     .as_ref()
-                    .map(|t| format!("{t:?}").to_lowercase())
-                    .unwrap_or_default(),
+                    .map_or_default(|t| format!("{t:?}").to_lowercase()),
                 s.status => case
                     .status
                     .as_ref()
-                    .map(|t| format!("{t:?}").to_lowercase())
-                    .unwrap_or_default(),
+                    .map_or_default(|t| format!("{t:?}").to_lowercase()),
                 s.active => "true",
             ))
             .map_err(|e| err(&format!("add document: {e}")))?;

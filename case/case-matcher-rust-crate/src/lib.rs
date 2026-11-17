@@ -58,7 +58,10 @@
 // Always start with high quality coding conventions.
 #![forbid(unsafe_code)] // pure library: no `unsafe` is ever needed.
 #![deny(missing_docs)] // every public item must carry a doc comment.
-#![warn(clippy::pedantic)] // opt in to Clippy's stricter lint set.
+#![warn(clippy::pedantic)]
+// opt in to Clippy's stricter lint set.
+// `assert!(x.is_empty())` reads better than `assert_eq!(x, [] as [T; 0])`.
+#![allow(clippy::assert_is_empty)]
 
 // ─── Modules ─────────────────────────────────────────────────────────
 // The crate is split one concern per module; `lib.rs` re-exports the

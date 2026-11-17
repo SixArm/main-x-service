@@ -360,8 +360,7 @@ impl Model {
     pub fn attrs(&self) -> BTreeMap<String, Vec<String>> {
         self.data
             .get("attrs")
-            .map(super::users::attributes_map)
-            .unwrap_or_default()
+            .map_or_default(super::users::attributes_map)
     }
 
     /// This session's CSRF synchroniser token (`data.csrf`), if any. A

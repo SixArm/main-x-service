@@ -137,8 +137,7 @@ pub fn to_fhir_device(thing: &Thing) -> FhirDevice {
     fhir.note = thing
         .description
         .clone()
-        .map(|text| vec![FhirAnnotation { text }])
-        .unwrap_or_default();
+        .map_or_default(|text| vec![FhirAnnotation { text }]);
 
     fhir
 }

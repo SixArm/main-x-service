@@ -68,8 +68,7 @@ impl PersonDto {
             .identifiers
             .iter()
             .find(|i| i.system == NHS_NUMBER_SYSTEM)
-            .map(|i| format_nhs_number(&i.value))
-            .unwrap_or_default();
+            .map_or_default(|i| format_nhs_number(&i.value));
         let given = self.name.given.join(" ");
         let full = if given.is_empty() {
             self.name.family.clone()

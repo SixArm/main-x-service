@@ -509,15 +509,13 @@ pub fn from_fhir_person(fhir_person: &FhirPerson) -> Result<Person> {
     let addresses = fhir_person
         .address
         .as_ref()
-        .map(|addrs| addrs.iter().map(address_from_fhir).collect())
-        .unwrap_or_default();
+        .map_or_default(|addrs| addrs.iter().map(address_from_fhir).collect());
 
     // Parse telecom
     let telecom = fhir_person
         .telecom
         .as_ref()
-        .map(|tels| tels.iter().filter_map(parse_fhir_contact_point).collect())
-        .unwrap_or_default();
+        .map_or_default(|tels| tels.iter().filter_map(parse_fhir_contact_point).collect());
 
     // Parse marital status, multiple birth, and the managing-organization
     // reference (the latter fallible — see `parse_managing_organization`).

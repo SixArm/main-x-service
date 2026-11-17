@@ -95,8 +95,7 @@ fn level_to_string(level: &EducationalLevel) -> String {
             .ok()
             .as_ref()
             .and_then(serde_json::Value::as_str)
-            .map(str::to_string)
-            .unwrap_or_default(),
+            .map_or_default(str::to_string),
     }
 }
 

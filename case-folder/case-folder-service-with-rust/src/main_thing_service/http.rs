@@ -103,8 +103,7 @@ impl ThingDto {
             .identifiers
             .iter()
             .find(|i| identifier_is_nhs_number(&i.property_id))
-            .map(|i| i.value.clone())
-            .unwrap_or_default();
+            .map_or_default(|i| i.value.clone());
         Some(Folder {
             id: self.id,
             title: self.name,
@@ -131,8 +130,7 @@ impl ThingDto {
             .identifiers
             .iter()
             .find(|i| identifier_is_nhs_number(&i.property_id))
-            .map(|i| i.value.clone())
-            .unwrap_or_default();
+            .map_or_default(|i| i.value.clone());
         Some(Volume {
             id: self.id,
             title: self.name,

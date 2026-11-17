@@ -77,7 +77,7 @@ impl SearchEngine {
             s.name => course.name.clone(),
             s.alternate_names => alt,
             s.course_code => course.course_code.clone().unwrap_or_default(),
-            s.provider_id => course.provider_id.map(|p| p.to_string()).unwrap_or_default(),
+            s.provider_id => course.provider_id.map_or_default(|p| p.to_string()),
             s.provider_name => String::new(),
             s.keywords => kw,
             s.teaches => teaches,

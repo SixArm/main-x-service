@@ -110,13 +110,13 @@ impl SearchEngine {
             schema.family_name => worker.name.family.clone(),
             schema.given_names => given_names,
             schema.full_name => full_name,
-            schema.birth_date => worker.birth_date.map(|d| d.to_string()).unwrap_or_default(),
+            schema.birth_date => worker.birth_date.map_or_default(|d| d.to_string()),
             schema.gender => format!("{:?}", worker.gender).to_lowercase(),
             schema.postal_code => postal_code,
             schema.city => city,
             schema.state => state,
             schema.identifiers => identifiers_str,
-            schema.worker_type => worker.worker_type.as_ref().map(std::string::ToString::to_string).unwrap_or_default(),
+            schema.worker_type => worker.worker_type.as_ref().map_or_default(std::string::ToString::to_string),
             schema.active => if worker.active { "true" } else { "false" },
         );
 
@@ -175,13 +175,13 @@ impl SearchEngine {
                 schema.family_name => worker.name.family.clone(),
                 schema.given_names => given_names,
                 schema.full_name => full_name,
-                schema.birth_date => worker.birth_date.map(|d| d.to_string()).unwrap_or_default(),
+                schema.birth_date => worker.birth_date.map_or_default(|d| d.to_string()),
                 schema.gender => format!("{:?}", worker.gender).to_lowercase(),
                 schema.postal_code => postal_code,
                 schema.city => city,
                 schema.state => state,
                 schema.identifiers => identifiers_str,
-                schema.worker_type => worker.worker_type.as_ref().map(std::string::ToString::to_string).unwrap_or_default(),
+                schema.worker_type => worker.worker_type.as_ref().map_or_default(std::string::ToString::to_string),
                 schema.active => if worker.active { "true" } else { "false" },
             );
 

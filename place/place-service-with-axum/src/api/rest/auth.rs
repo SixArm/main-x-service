@@ -277,10 +277,7 @@ pub async fn init() {
 /// Seed the PASETO [`verifier`] (the `paseto` half of [`init`]).
 #[cfg(feature = "paseto")]
 async fn init_paseto() {
-    if std::env::var("PLACE_PASETO_KEYS_URL")
-        .ok()
-        .is_some_and(|u| !u.trim().is_empty())
-    {
+    if std::env::var("PLACE_PASETO_KEYS_URL").is_ok_and(|u| !u.trim().is_empty()) {
         verifier().store(super::state::boot_verifier().await);
     }
 }

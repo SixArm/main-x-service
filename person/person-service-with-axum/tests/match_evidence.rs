@@ -1,4 +1,6 @@
 #![warn(clippy::pedantic)]
+// `assert!(x.is_empty())` reads better than `assert_eq!(x, [] as [T; 0])`.
+#![allow(clippy::assert_is_empty)]
 
 //! Match evidence through the service (`agents/share/match-evidence.md`
 //! §10 step 4): the batch scan flags an automatic merge only for a

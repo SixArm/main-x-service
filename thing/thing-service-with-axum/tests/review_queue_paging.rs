@@ -1,4 +1,6 @@
 #![warn(clippy::pedantic)]
+// `assert!(x.is_empty())` reads better than `assert_eq!(x, [] as [T; 0])`.
+#![allow(clippy::assert_is_empty)]
 
 //! `GET /api/things/review-queue` pages by signed cursor (spec §13 T-19):
 //! following `Link: rel="next"` reaches every stored pair, each once, even

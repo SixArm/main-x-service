@@ -1,4 +1,6 @@
 #![warn(clippy::pedantic)]
+// `assert!(x.is_empty())` reads better than `assert_eq!(x, [] as [T; 0])`.
+#![allow(clippy::assert_is_empty)]
 
 //! T-32 integration tests (`agents/share/cross-service-linking.md` §5.2,
 //! `link-graph-service-with-axum/spec/16-open-questions.md` OQ-9(b)):

@@ -578,6 +578,8 @@ pub async fn delete_instance(
 /// Guard used by the instance sub-resource handlers: confirm the parent
 /// course exists before touching its instances. Returns the ready-made
 /// `404` (or `500`) response in the `Err` arm so callers can early-return.
+// The `Err` arm is a ready-made HTTP response, returned as-is to early-return.
+#[allow(clippy::result_large_err)]
 async fn require_course_exists(
     state: &AppState,
     course_id: &Uuid,

@@ -1,4 +1,6 @@
 #![warn(clippy::pedantic)]
+// `assert!(x.is_empty())` reads better than `assert_eq!(x, [] as [T; 0])`.
+#![allow(clippy::assert_is_empty)]
 
 //! DB-gated proof that `GET /api/audit/verify` examines the **newest**
 //! audit rows (repo `tasks.md` LG-A1), not an arbitrary sample.

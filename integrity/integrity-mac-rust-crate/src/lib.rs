@@ -349,9 +349,7 @@ impl KeySet {
         key_id: Option<&str>,
         domains: &[&str],
     ) -> Self {
-        let mut by_id = retired
-            .map(|r| parse_retired(*config, r, domains))
-            .unwrap_or_default();
+        let mut by_id = retired.map_or_default(|r| parse_retired(*config, r, domains));
 
         let active = match raw_key.map(str::trim).filter(|s| !s.is_empty()) {
             None => None,
@@ -685,7 +683,9 @@ fn decode_hex(s: &str) -> Option<Vec<u8>> {
         return None;
     }
     bytes
-        .chunks_exact(2)
+        .as_chunks::<2>()
+        .0
+        .iter()
         .map(|pair| Some((hex_nibble(pair[0])? << 4) | hex_nibble(pair[1])?))
         .collect()
 }

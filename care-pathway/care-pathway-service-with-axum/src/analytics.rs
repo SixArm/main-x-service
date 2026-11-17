@@ -250,8 +250,7 @@ pub const CSV_CONTENT_TYPE: &str = "text/csv";
 /// panicking.
 fn rfc3339_ms(ms: i64) -> String {
     chrono::DateTime::<chrono::Utc>::from_timestamp_millis(ms)
-        .map(|dt| dt.to_rfc3339_opts(chrono::SecondsFormat::Millis, true))
-        .unwrap_or_default()
+        .map_or_default(|dt| dt.to_rfc3339_opts(chrono::SecondsFormat::Millis, true))
 }
 
 /// Build the `event_log` rows for one instance (spec T-14a): one row per

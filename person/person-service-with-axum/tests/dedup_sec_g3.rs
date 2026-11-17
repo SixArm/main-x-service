@@ -1,4 +1,6 @@
 #![warn(clippy::pedantic)]
+// `assert!(x.is_empty())` reads better than `assert_eq!(x, [] as [T; 0])`.
+#![allow(clippy::assert_is_empty)]
 
 //! SEC-G3 on the duplicate paths: `POST /api/persons/check-duplicates`,
 //! `POST /api/persons/match` and the create-time `409` apply the same per-record read visibility

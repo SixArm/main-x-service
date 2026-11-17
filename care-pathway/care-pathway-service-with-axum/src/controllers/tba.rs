@@ -945,13 +945,12 @@ fn split_side_payload(
 /// echoing back verbatim (each token already validated during
 /// [`resolve_rule`], so this is display only, not a second parse).
 fn echo_tokens(raw: Option<&str>) -> Vec<&str> {
-    raw.map(|raw| {
+    raw.map_or_default(|raw| {
         raw.split(',')
             .map(str::trim)
             .filter(|token| !token.is_empty())
             .collect()
     })
-    .unwrap_or_default()
 }
 
 /// The whole `split` block for a `time-analysis` response (spec

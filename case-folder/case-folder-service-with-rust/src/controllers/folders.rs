@@ -193,11 +193,7 @@ pub async fn create(
     let patient = match patients.find_by_nhs_number(&input.nhs_number).await {
         Ok(Some(p)) => p,
         Ok(None) => {
-            let name = input
-                .patient_name
-                .as_deref()
-                .map(str::trim)
-                .unwrap_or_default();
+            let name = input.patient_name.as_deref().map_or_default(str::trim);
             if name.is_empty() {
                 errors.insert(
                     "patient_name".into(),

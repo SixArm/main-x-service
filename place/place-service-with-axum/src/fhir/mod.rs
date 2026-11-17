@@ -123,8 +123,7 @@ fn to_fhir_address(addr: &PostalAddress) -> FhirAddress {
     let line = addr
         .street_address
         .as_deref()
-        .map(|s| s.lines().map(str::to_string).collect::<Vec<_>>())
-        .unwrap_or_default();
+        .map_or_default(|s| s.lines().map(str::to_string).collect::<Vec<_>>());
     FhirAddress {
         line,
         city: addr.address_locality.clone(),

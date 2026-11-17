@@ -182,6 +182,8 @@ impl AccessContext {
 impl<S: Send + Sync> FromRequestParts<S> for AccessContext {
     type Rejection = std::convert::Infallible;
 
+    // The trait requires `async`; nothing here awaits.
+    #[allow(clippy::unused_async_trait_impl)]
     async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
         let header = |name: &str| parts.headers.get(name).and_then(|v| v.to_str().ok());
         Ok(Self::from_parts(

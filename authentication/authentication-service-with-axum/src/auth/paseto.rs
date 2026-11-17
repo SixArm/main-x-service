@@ -461,6 +461,8 @@ where
 {
     type Rejection = (StatusCode, &'static str);
 
+    // The trait requires `async`; nothing here awaits.
+    #[allow(clippy::unused_async_trait_impl)]
     async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
         let header = parts
             .headers

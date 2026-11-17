@@ -133,7 +133,7 @@ async fn whiteboard(
         let stay = stay_rows.iter().find(|s| s.bed_pid == Some(bed.pid));
         let card = BedCard {
             bed_pid: bed.pid.to_string(),
-            bay_name: bay.map(|b| b.name.clone()).unwrap_or_default(),
+            bay_name: bay.map_or_default(|b| b.name.clone()),
             number: bed.number.clone(),
             state: bed.state.clone(),
             state_since: bed.state_since,
@@ -167,28 +167,25 @@ async fn whiteboard(
                     .find(|r| r.stay_pid == s.pid)
                     .map(|r| r.classification.clone())
             }),
-            infection: stay
-                .map(|s| {
-                    flags
-                        .iter()
-                        .filter(|f| f.stay_pid == s.pid)
-                        .map(|f| {
-                            serde_json::json!({
-                                "precaution": f.precaution,
-                                "organism": f.organism,
-                                "status": f.status,
-                            })
+            infection: stay.map_or_default(|s| {
+                flags
+                    .iter()
+                    .filter(|f| f.stay_pid == s.pid)
+                    .map(|f| {
+                        serde_json::json!({
+                            "precaution": f.precaution,
+                            "organism": f.organism,
+                            "status": f.status,
                         })
-                        .collect()
-                })
-                .unwrap_or_default(),
+                    })
+                    .collect()
+            }),
             alerts: if masked {
                 Vec::new()
             } else {
-                stay.map(|s| {
+                stay.map_or_default(|s| {
                     serde_json::from_value::<Vec<String>>(s.alerts.clone()).unwrap_or_default()
                 })
-                .unwrap_or_default()
             },
         };
         cards.push(card);

@@ -773,7 +773,7 @@ mod tests {
         let expected = (NAME_M / NAME_U).log2()
             + (RELATIONSHIPS_M / RELATIONSHIPS_U).log2()
             + (TEACHES_M / TEACHES_U).log2()
-            + 0.5 * ((KEYWORDS_M / KEYWORDS_U).log2() + (TAGS_M / TAGS_U).log2())
+            + f64::midpoint((KEYWORDS_M / KEYWORDS_U).log2(), (TAGS_M / TAGS_U).log2())
             + (PROVIDER_M / PROVIDER_U).log2()
             + 0.5 * (EDUCATIONAL_LEVEL_M / EDUCATIONAL_LEVEL_U).log2();
         assert!((r.evidence.weight_bits - expected).abs() < 1e-9);

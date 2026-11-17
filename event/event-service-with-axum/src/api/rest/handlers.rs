@@ -610,14 +610,16 @@ pub(crate) async fn check_duplicates_internal(
     state
         .matcher
         .find_matches(event, &candidates, frequencies.as_ref())
-        .map(|results| {
-            results
-                .into_iter()
-                .filter(|m| m.is_match)
-                .map(to_match_response)
-                .collect()
-        })
-        .unwrap_or_default()
+        .map_or_else(
+            |_| Vec::new(),
+            |results| {
+                results
+                    .into_iter()
+                    .filter(|m| m.is_match)
+                    .map(to_match_response)
+                    .collect()
+            },
+        )
 }
 
 /// Build the candidate set for matching ("blocking").

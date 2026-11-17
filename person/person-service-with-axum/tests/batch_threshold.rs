@@ -1,4 +1,6 @@
 #![warn(clippy::pedantic)]
+// `assert!(x.is_empty())` reads better than `assert_eq!(x, [] as [T; 0])`.
+#![allow(clippy::assert_is_empty)]
 
 //! `POST /api/persons/deduplicate` honours a `threshold` below the
 //! matcher's configured one. It filtered through `find_matches`, which

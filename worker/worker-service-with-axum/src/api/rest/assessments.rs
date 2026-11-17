@@ -431,6 +431,7 @@ fn actor(ctx: &AuditContext) -> AuditActor<'_> {
 /// `mask`). Every endpoint in this module starts here, so the
 /// assessment surface can never be a way around the worker's own
 /// authorization.
+#[allow(clippy::result_large_err)] // the `Err` arm is a ready-made HTTP response
 async fn worker_and_obligations(
     state: &AppState,
     id: Uuid,
