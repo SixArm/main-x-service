@@ -410,6 +410,11 @@ impl Verifier {
                 "key-set URL must be https:// (or http:// on loopback); refusing to fetch {url}"
             )));
         }
+        // reqwest's `rustls-no-provider` panics when a client is built with no
+        // process-default provider, and rustls picking the one compiled-in
+        // provider by itself does not satisfy it. An `Err` only means a
+        // provider is already installed, which is fine.
+        let _ = rustls::crypto::ring::default_provider().install_default();
         let client = reqwest::Client::builder()
             // SEC-V1: bound boot time so a hung/slow key endpoint can't stall
             // startup indefinitely.

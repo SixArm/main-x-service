@@ -346,7 +346,7 @@ impl IdentitySource for HttpIdentitySource {
     }
 
     async fn fetch_all(&self) -> ModelResult<Vec<(EntityRef, IdentityProbe)>> {
-        let client = reqwest::Client::new();
+        let client = crate::tls::client();
         let mut out = Vec::new();
         let mut offset = 0usize;
         loop {
@@ -435,7 +435,7 @@ impl SuggestionSink for HttpSuggestionSink {
                 "gender_score": candidate.score.gender_score,
             },
         });
-        let mut request = reqwest::Client::new().post(&url).json(&body);
+        let mut request = crate::tls::client().post(&url).json(&body);
         if let Some(token) = &self.token {
             request = request.bearer_auth(token);
         }

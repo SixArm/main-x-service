@@ -2160,6 +2160,7 @@ dependencies = [
  "mimalloc",
  "prometheus",
  "reqwest 0.13.5",
+ "rustls",
  "rusty_paseto",
  "serde",
  "serde_json",

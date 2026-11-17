@@ -93,7 +93,7 @@ fluvio = { version = "0.50", optional = true, default-features = false, features
 # The process-wide rustls provider, installed explicitly in `main` because a
 # `fluvio` build has both ring and aws-lc-rs compiled in and rustls will not
 # guess between them.
-rustls = { version = "0.23", optional = true, default-features = false, features = ["ring", "std", "tls12"] }
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
 # `StreamExt::next()` over a Fluvio `ConsumerStream`.
 futures-util = { version = "0.3", optional = true, default-features = false, features = [
   "std",
@@ -111,7 +111,7 @@ keycloak = ["authentication-verifier/keycloak"]
 # Off by default. The read-only-to-world posture and the `apply_event`/
 # `apply_event_idempotent` seam need no feature; only the real Fluvio
 # producer connection lives behind this.
-fluvio = ["dep:fluvio", "dep:rustls", "dep:futures-util"]
+fluvio = ["dep:fluvio", "dep:futures-util"]
 
 [[bin]]
 name = "link-graph-service"

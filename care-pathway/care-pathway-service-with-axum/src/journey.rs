@@ -226,7 +226,7 @@ pub fn parse_leg(body: &serde_json::Value) -> Option<LegTimeline> {
 pub fn leg_client() -> &'static reqwest::Client {
     static CLIENT: std::sync::OnceLock<reqwest::Client> = std::sync::OnceLock::new();
     CLIENT.get_or_init(|| {
-        reqwest::Client::builder()
+        crate::tls::client_builder()
             .redirect(reqwest::redirect::Policy::none())
             .timeout(LEG_TIMEOUT)
             .build()

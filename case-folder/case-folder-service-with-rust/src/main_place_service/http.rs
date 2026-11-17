@@ -91,7 +91,7 @@ impl HttpClient {
     pub fn new(base_url: impl Into<String>) -> Self {
         Self {
             base_url: base_url.into().trim_end_matches('/').to_string(),
-            http: reqwest::Client::builder()
+            http: crate::tls::client_builder()
                 .timeout(std::time::Duration::from_secs(5))
                 .build()
                 .expect("build reqwest client"),

@@ -129,7 +129,7 @@ fluvio = { version = "0.50", optional = true, default-features = false, features
 # The process-wide rustls provider, installed explicitly in `main` because a
 # `fluvio` build has both ring and aws-lc-rs compiled in and rustls will not
 # guess between them.
-rustls = { version = "0.23", optional = true, default-features = false, features = ["ring", "std", "tls12"] }
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
 
 [[bin]]
 name = "care-pathway-service"
@@ -152,7 +152,7 @@ s3 = ["dep:aws-config", "dep:aws-sdk-s3", "dep:aws-credential-types", "dep:aws-s
 # Off by default. The relay's `EventSink` seam (src/relay.rs) needs no
 # feature to build or test; only `FluvioSink` — the real-broker producer
 # — lives behind this.
-fluvio = ["dep:fluvio", "dep:rustls"]
+fluvio = ["dep:fluvio"]
 
 [dev-dependencies]
 axa-test = "0.11"

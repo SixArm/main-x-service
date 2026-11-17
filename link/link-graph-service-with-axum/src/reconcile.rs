@@ -252,7 +252,7 @@ impl AuthoritativeSource for HttpAuthoritativeSource {
     }
 
     async fn fetch_all(&self) -> ModelResult<Vec<LinkedEvent>> {
-        let mut request = reqwest::Client::new().get(&self.url);
+        let mut request = crate::tls::client().get(&self.url);
         if let Some(token) = &self.token {
             request = request.bearer_auth(token);
         }

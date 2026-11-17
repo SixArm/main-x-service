@@ -17,6 +17,7 @@ categories = ["development-tools", "rust-patterns"]
 include = ["src/**/*", "README.md"]
 
 [dependencies]
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
 axa = { version = "0.20", features = ["postgres-sqlx", "openapi", "versioning", "ratelimit"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["float_roundtrip", "arbitrary_precision"] }

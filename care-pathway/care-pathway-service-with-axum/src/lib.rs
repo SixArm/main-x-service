@@ -112,6 +112,7 @@ pub mod tasks;
 /// running lead time in as if it had already closed, plus a two-sample
 /// log-rank test ready for T-14f's cohort split to call.
 pub mod tba;
+pub mod tls;
 pub mod validation;
 /// Journey variants (pathway strings): named, defaulted, echoed
 /// transform parameters over a cohort's segments into a frequency/

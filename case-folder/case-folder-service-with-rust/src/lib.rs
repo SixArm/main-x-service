@@ -42,6 +42,7 @@
 pub mod app;
 /// Request limits per client and a lockout after failed authentication.
 pub mod client_limits;
+pub mod tls;
 
 /// Passwordless magic-link authentication state: identity allowlist,
 /// magic + session token minting/verification, session cookie handling.

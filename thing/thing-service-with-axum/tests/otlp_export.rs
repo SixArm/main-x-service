@@ -38,6 +38,8 @@ fn http() -> Http {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn a_served_request_is_exported_with_its_metric_and_traceparent() {
+    // reqwest's `rustls-no-provider` needs a process-default provider.
+    let _ = rustls::crypto::ring::default_provider().install_default();
     let (endpoint, captured) = otlp_collector::start().await;
     let config = Config {
         service_name: "thing-service-otlp-test".to_string(),

@@ -110,7 +110,7 @@ fn outcome_from_status(status: reqwest::StatusCode) -> ProbeOutcome {
 fn no_redirect_client() -> &'static reqwest::Client {
     static CLIENT: std::sync::OnceLock<reqwest::Client> = std::sync::OnceLock::new();
     CLIENT.get_or_init(|| {
-        reqwest::Client::builder()
+        crate::tls::client_builder()
             .redirect(reqwest::redirect::Policy::none())
             .build()
             .expect("build the non-redirecting presence-probe client")
