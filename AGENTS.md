@@ -198,17 +198,16 @@ discovers the ~55 crates and feeds them to each stage.
 | `msrv` | `cargo +<msrv> check --all-targets` | asserts every `rust-version` equals [`ci/msrv.txt`](ci/msrv.txt), then compiles against that toolchain |
 | `bench` | `cargo bench --no-run` | compiles the Criterion benches (`--all-targets` already type-checks them; this proves they *link*) |
 
-**The MSRV is the current stable minus two** — today **1.97**, from
-stable 1.99. It is declared per crate (`rust-version` in every
+**The MSRV is the current stable minus two** — today **1.98**, from
+stable 1.100. It is declared per crate (`rust-version` in every
 `[package]`, since there is no root manifest to inherit from), sourced
-from [`ci/msrv.txt`](ci/msrv.txt), and enforced by the `msrv` stage. At
-N-2 the MSRV's minor version now coincides with the
-`rust-toolchain.toml` pin (1.97.1, what we build with) — the pin still
-carries a patch version the MSRV does not, so the two remain distinct
-numbers with distinct jobs (§3 of the policy doc), they simply moved
-closer together than they were at N-3. The binding constraint is still
+from [`ci/msrv.txt`](ci/msrv.txt), and enforced by the `msrv` stage. The
+`rust-toolchain.toml` pin (1.100.0, what we build, format and lint with) is
+deliberately ahead of the MSRV; they are distinct numbers with distinct jobs
+(§3 of the policy doc). `make test-minimum-supported-rust-version` checks and
+tests both N-2 and N-1. The binding constraint is still
 the dependency graph, not our code: axa 0.11 requires 1.97 (sqlx 0.9
-requires 1.94), so the MSRV meets the floor with no headroom, and an axa
+requires 1.94), so the MSRV sits one release above the floor, and an axa
 release that raises its `rust-version` raises ours with it. See
 [`spec/rust-msrv-n-minus-2/index.md`](spec/rust-msrv-n-minus-2/index.md) for the
 policy and the bump procedure.

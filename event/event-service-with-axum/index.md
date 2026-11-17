@@ -2,7 +2,7 @@
 
 A high-performance, enterprise-grade Event Service system built with Rust.
 
-[![Rust](https://img.shields.io/badge/rust-1.97%2B-orange.svg)](https://www.rust-lang.org/)
+[![Rust](https://img.shields.io/badge/rust-1.98%2B-orange.svg)](https://www.rust-lang.org/)
 [![License](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](#license)
 [![Podman](https://img.shields.io/badge/podman-ready-brightgreen.svg)](Dockerfile)
 
@@ -217,7 +217,7 @@ See [DEPLOY.md](DEPLOY.md) for complete deployment guide.
 
 **Prerequisites:**
 
-- Rust 1.97+ ([Install Rust](https://rustup.rs/))
+- Rust 1.98+ ([Install Rust](https://rustup.rs/))
 - PostgreSQL 18+
 - No extra CLI tooling required: migrations run through the built-in
   axa CLI (`cargo run -- db migrate`)
@@ -289,7 +289,7 @@ See [DEPLOY.md](DEPLOY.md) for comprehensive deployment instructions.
 
 | Component            | Technology                           | Purpose                                  |
 | -------------------- | ------------------------------------ | ---------------------------------------- |
-| **Language**         | Rust 1.97+ 2024 Edition              | Systems programming, performance, safety |
+| **Language**         | Rust 1.98+ 2024 Edition              | Systems programming, performance, safety |
 | **Async Runtime**    | Tokio                                | Asynchronous I/O and concurrency         |
 | **Web Framework**    | Axum                                 | HTTP server and routing                  |
 | **Web Framework**    | axa                                 | HTTP server and routing                  |

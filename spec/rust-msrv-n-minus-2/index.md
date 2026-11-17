@@ -6,16 +6,16 @@ stable compiler is `1.N`, the MSRV is `1.(N-2)`.
 
 | | |
 |---|---|
-| Current stable (`N`) | **1.99.1** (2026-10-13) |
-| **Declared MSRV (`N-2`)** | **1.97** |
-| Toolchain we *build* with | **1.97.1** (`rust-toolchain.toml`) |
+| Current stable (`N`) | **1.100.0** (2026-11-17) |
+| **Declared MSRV (`N-2`)** | **1.98** |
+| Toolchain we *build* with | **1.100.0** (`rust-toolchain.toml`) |
 | Single source of truth | [`ci/msrv.txt`](../../ci/msrv.txt) |
 
-At N-2 the MSRV's minor version happens to coincide with the build
-pin's minor version (both `1.97`) — the pin still carries a patch
-number the MSRV does not, so they remain two different numbers with
-two different jobs (§3). This is closer together than the family's
-former N-3 policy ever put them, and is a property of today's specific
+The build pin (since 2026-11-17, 1.100.0) is deliberately ahead of the MSRV: it
+is the current stable we format and lint with, while the MSRV is the oldest
+compiler we promise still works. They are two numbers with two different jobs
+(§3). `make test-minimum-supported-rust-version` proves both N-2 and N-1.
+The two once coincided, a property of that moment's specific
 numbers, not something the policy guarantees going forward — the next
 stable release moves the MSRV but not the pin, and they will drift
 apart again until the pin is next bumped.
@@ -38,7 +38,7 @@ apart again until the pin is next bumped.
   uses day to day.
 - **N-2 is a ceiling on our conservatism, not a target.** Nothing obliges
   a crate to sit exactly at the floor. What is forbidden is *silently*
-  drifting above it: a language or `std` feature stabilised after 1.97
+  drifting above it: a language or `std` feature stabilised after 1.98
   may not be used until the floor moves.
 
 ### Why N-2 and not N-3
@@ -59,7 +59,7 @@ change. The reasoning for tightening to N-2:
   failure N-3 was originally chosen to avoid, and N-2 still avoids it.
 - **N-2 still sits comfortably above the real dependency floor** (§4):
   as of this change the loco-based services transitively require
-  1.94, so 1.97 clears it by three releases — one more release of
+  1.94, so 1.98 clears it by four releases — one more release of
   headroom than N-3 had, not less, because stable itself moved on in
   the interim.
 
@@ -71,7 +71,7 @@ Every crate's `Cargo.toml` carries the version in its `[package]` table:
 [package]
 name = "person-matcher"
 edition = "2024"
-rust-version = "1.97"
+rust-version = "1.98"
 ```
 
 - It is declared **per crate** rather than inherited, because this
@@ -85,7 +85,7 @@ rust-version = "1.97"
   Cargo is **MSRV-aware**: when resolving a dependency it prefers the
   newest version compatible with the declared floor, and it refuses to
   build when a locked dependency demands a newer compiler than the
-  toolchain in use. Declaring the field is what turns "we support 1.97"
+  toolchain in use. Declaring the field is what turns "we support 1.98"
   from a README claim into something the build system enforces.
 
 ### Exempt: the `fuzz/` sub-crates
@@ -104,9 +104,9 @@ They are routinely confused, so, explicitly:
 
 | Number | Where | What it means |
 |---|---|---|
-| **1.98** (`N`) | upstream | the newest stable compiler that exists |
-| **1.97.1** | [`rust-toolchain.toml`](../../rust-toolchain.toml) | the compiler this repo *builds and formats with*, pinned so `cargo fmt` is byte-identical on every machine |
-| **1.97** (`N-2`) | `ci/msrv.txt` + every `Cargo.toml` | the oldest compiler we *promise still works* |
+| **1.100** (`N`) | upstream | the newest stable compiler that exists |
+| **1.100.0** | [`rust-toolchain.toml`](../../rust-toolchain.toml) | the compiler this repo *builds and formats with*, pinned so `cargo fmt` is byte-identical on every machine |
+| **1.98** (`N-2`) | `ci/msrv.txt` + every `Cargo.toml` | the oldest compiler we *promise still works* |
 
 The pin exists to stop rustfmt drift churning the tree; the MSRV exists
 to stop us breaking a consumer. Bumping one does **not** imply bumping
@@ -133,17 +133,17 @@ The stage does two things:
    field fails here, which is the only reliable way to keep 46 manifests
    in step.
 2. **Compilation** — `cargo +<msrv> check --all-targets` in each crate,
-   which is where a `std` method stabilised in 1.97 is actually caught.
+   which is where a `std` method stabilised in 1.98 is actually caught.
    `--all-targets` matters: benches and tests use APIs the library does
    not, and an MSRV that only holds for `src/` is not one a consumer can
    rely on.
 
-Run locally with `rustup toolchain install 1.97 --profile minimal`
+Run locally with `rustup toolchain install 1.98 --profile minimal`
 first; CI installs it in the job.
 
 ### The dependency floor is the binding constraint
 
-Our own code compiles far below 1.97. What does not is the dependency
+Our own code compiles far below 1.98. What does not is the dependency
 graph: the axa services transitively require
 
 ```
@@ -151,7 +151,7 @@ axa 0.11                             → rustc 1.97
 sqlx 0.9.0                           → rustc 1.94
 ```
 
-so **axa's 1.97 is the true floor, and it equals the MSRV with no headroom.** This is
+so **axa 0.11's 1.97 is the true floor, one release below the MSRV (axa 0.17 and later require 1.98, which is the MSRV exactly).** This is
 worth watching rather than assuming: a dependency bump can raise the
 floor above N-2 without a single line of our code changing, and the
 `msrv` stage is what turns that into a red build instead of a surprise
