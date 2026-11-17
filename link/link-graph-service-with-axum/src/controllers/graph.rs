@@ -113,7 +113,7 @@ struct NeighborsData {
     /// The incident edges.
     edges: Vec<edges::Model>,
     /// The read-model freshness watermark.
-    as_of: Option<DateTime<FixedOffset>>,
+    as_of: Option<jiff::Timestamp>,
 }
 
 /// `data` payload for `GET /api/edges`.
@@ -122,7 +122,7 @@ struct EdgesData {
     /// The filtered edges.
     edges: Vec<edges::Model>,
     /// The read-model freshness watermark.
-    as_of: Option<DateTime<FixedOffset>>,
+    as_of: Option<jiff::Timestamp>,
 }
 
 /// One affiliation edge in a single-view response.
@@ -144,7 +144,7 @@ struct SingleViewData {
     /// The affiliations incident to the identity set.
     affiliations: Vec<AffiliationDto>,
     /// The read-model freshness watermark.
-    as_of: Option<DateTime<FixedOffset>>,
+    as_of: Option<jiff::Timestamp>,
 }
 
 /// One topic's freshness in the freshness response.
@@ -153,7 +153,7 @@ struct TopicFreshness {
     /// The entity token behind the topic.
     entity: String,
     /// The `occurred_at` of the last consumed event.
-    last_occurred_at: DateTime<FixedOffset>,
+    last_occurred_at: jiff::Timestamp,
     /// Seconds between now and `last_occurred_at`.
     lag_seconds: i64,
 }
@@ -164,7 +164,7 @@ struct FreshnessData {
     /// Per-topic freshness.
     topics: Vec<TopicFreshness>,
     /// The read-model freshness watermark.
-    as_of: Option<DateTime<FixedOffset>>,
+    as_of: Option<jiff::Timestamp>,
 }
 
 /// Bounded breadth-first collection of edges incident to `start`, up to
@@ -371,13 +371,13 @@ async fn single_view(
 #[debug_handler]
 async fn freshness(State(ctx): State<AppContext>) -> Result<Response> {
     let rows = consumer_offsets::Model::freshness(&ctx.db).await?;
-    let now = Utc::now().fixed_offset();
+    let now = jiff::Timestamp::now();
     let topics: Vec<TopicFreshness> = rows
         .iter()
         .map(|(topic, occurred)| TopicFreshness {
             entity: entity_from_topic(topic).to_string(),
             last_occurred_at: *occurred,
-            lag_seconds: (now - *occurred).num_seconds(),
+            lag_seconds: now.as_second() - occurred.as_second(),
         })
         .collect();
     let as_of = rows.iter().map(|(_, t)| *t).max();

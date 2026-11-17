@@ -139,6 +139,13 @@ pub async fn apply_event(db: impl Into<Db<'_>>, envelope: Envelope) -> Result<()
     apply_event_on(&mut conn, envelope).await
 }
 
+/// An envelope's chrono instant as a jiff `Timestamp`, until the envelope
+/// itself moves to jiff. The epoch stands in for an out-of-range instant.
+fn to_jiff(t: DateTime<FixedOffset>) -> jiff::Timestamp {
+    let nanos = i32::try_from(t.timestamp_subsec_nanos()).unwrap_or(0);
+    jiff::Timestamp::new(t.timestamp(), nanos).unwrap_or(jiff::Timestamp::UNIX_EPOCH)
+}
+
 /// [`apply_event`] on a connection the caller holds, so every statement
 /// of one event runs on one connection.
 async fn apply_event_on(conn: &mut sqlx::PgConnection, envelope: Envelope) -> Result<()> {
@@ -206,7 +213,7 @@ async fn apply_event_on(conn: &mut sqlx::PgConnection, envelope: Envelope) -> Re
     }
 
     let topic = topic_for(&envelope.entity);
-    consumer_offsets::Model::record(&mut *conn, &topic, seq, occurred_at).await?;
+    consumer_offsets::Model::record(&mut *conn, &topic, seq, to_jiff(occurred_at)).await?;
     Ok(())
 }
 

@@ -32,11 +32,11 @@ async fn metrics_prom(State(ctx): State<AppContext>) -> Result<Response> {
     }
 
     // Per-entity consumer lag (now − last consumed occurred_at).
-    let now = Utc::now().fixed_offset();
+    let now = jiff::Timestamp::now();
     for (topic, last) in consumer_offsets::Model::freshness(&ctx.db).await? {
         m.consumer_lag_seconds
             .with_label_values(&[entity_from_topic(&topic)])
-            .set((now - last).num_seconds());
+            .set(now.as_second() - last.as_second());
     }
 
     Ok((

@@ -2,7 +2,8 @@
 //! watermark (spec §10.3 / §6 FR-16/17).
 
 use axa::postgres_sqlx::Db;
-use chrono::{DateTime, FixedOffset};
+use jiff::Timestamp;
+use jiff_sqlx::ToSqlx;
 use serde::{Deserialize, Serialize};
 
 use super::ModelResult;
@@ -15,7 +16,7 @@ pub struct Model {
     /// The last committed bus offset for this topic.
     pub offset_val: i64,
     /// The `occurred_at` of the last consumed event on this topic.
-    pub last_occurred_at: DateTime<FixedOffset>,
+    pub last_occurred_at: jiff_sqlx::Timestamp,
 }
 
 impl Model {
@@ -29,7 +30,7 @@ impl Model {
         db: impl Into<Db<'_>>,
         topic: &str,
         offset: i64,
-        occurred_at: DateTime<FixedOffset>,
+        occurred_at: Timestamp,
     ) -> ModelResult<()> {
         let mut conn = db.into().acquire().await?;
         sqlx::query!(
@@ -40,7 +41,7 @@ impl Model {
                      last_occurred_at = excluded.last_occurred_at",
             topic,
             offset,
-            occurred_at,
+            occurred_at.to_sqlx(),
         )
         .execute(&mut *conn)
         .await?;
@@ -54,7 +55,7 @@ impl Model {
     /// When the query fails.
     pub async fn freshness(
         db: impl Into<Db<'_>>,
-    ) -> ModelResult<Vec<(String, DateTime<FixedOffset>)>> {
+    ) -> ModelResult<Vec<(String, Timestamp)>> {
         let mut conn = db.into().acquire().await?;
         let rows = sqlx::query_as!(
             Self,
@@ -65,7 +66,7 @@ impl Model {
         .await?;
         Ok(rows
             .into_iter()
-            .map(|m| (m.topic, m.last_occurred_at))
+            .map(|m| (m.topic, m.last_occurred_at.to_jiff()))
             .collect())
     }
 
@@ -76,7 +77,7 @@ impl Model {
     /// # Errors
     ///
     /// When the query fails.
-    pub async fn watermark(db: impl Into<Db<'_>>) -> ModelResult<Option<DateTime<FixedOffset>>> {
+    pub async fn watermark(db: impl Into<Db<'_>>) -> ModelResult<Option<Timestamp>> {
         let latest = Self::freshness(db).await?.into_iter().map(|(_, t)| t).max();
         Ok(latest)
     }
