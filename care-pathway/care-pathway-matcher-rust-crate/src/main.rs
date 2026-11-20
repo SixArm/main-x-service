@@ -2,7 +2,7 @@
 //! public API. Not part of the `SemVer` surface.
 
 // Always start with high quality coding conventions
-// (`agents/share/rust-loco-stack.md`).
+// (`agents/share/rust-axum-stack.md`).
 // SEC-I3: this demo has no reason to reach for `unsafe`; forbid it so the
 // crate's binary target matches the `#![forbid(unsafe_code)]` on its lib.
 #![forbid(unsafe_code)]

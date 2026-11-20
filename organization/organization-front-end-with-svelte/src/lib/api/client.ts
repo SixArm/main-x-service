@@ -1,6 +1,6 @@
 // Lean fetch wrapper for the Organization Service.
 //
-// The service is a loco.rs app: handlers return RAW JSON (no
+// The service is an axa app: handlers return RAW JSON (no
 // {success,data,error} envelope), so this client returns the parsed
 // body directly and throws ApiError on non-2xx.
 //

@@ -1,6 +1,6 @@
 ### project-portfolio-management-service — example requests
 # https://github.com/project-portfolio-management/project-portfolio-management/tree/main/project-portfolio-management-service-with-rust (extracted from this monorepo)
-# — controller-style layout (src/controllers/). Envelope: BARE loco JSON,
+# — controller-style layout (src/controllers/). Envelope: BARE JSON,
 # same posture as organization.http — see that file's header. Gated by
 # PROJECT_PORTFOLIO_MANAGEMENT_REQUIRE_AUTH (default off). One recursive
 # `Plan` type — `kind` (Project/Portfolio/Product/Program/...) is an

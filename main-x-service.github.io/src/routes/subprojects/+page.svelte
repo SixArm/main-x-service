@@ -63,7 +63,7 @@
     ];
 
     const sections: { title: string; rows: Row[]; nameLabel: string }[] = [
-        { title: "Entity registry services (Rust, loco.rs)", rows: services, nameLabel: "Crate" },
+        { title: "Entity registry services (Rust, Axum)", rows: services, nameLabel: "Crate" },
         { title: "Matcher crates", rows: matchers, nameLabel: "Crate" },
         { title: "Library crates", rows: libraries, nameLabel: "Crate" },
         { title: "Front-end projects (SvelteKit)", rows: frontEnds, nameLabel: "Project" },

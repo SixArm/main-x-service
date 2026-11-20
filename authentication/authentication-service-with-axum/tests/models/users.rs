@@ -44,7 +44,7 @@ async fn test_can_validate_model() {
     assert_debug_snapshot!(res);
 }
 
-/// Pins the loco-scaffold password registration path (`create_with_password`)
+/// Pins the legacy-scaffold password registration path (`create_with_password`)
 /// still works against the schema (snapshot; not used by the live flow).
 #[tokio::test]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with: cargo test -- --ignored"]
@@ -147,7 +147,7 @@ async fn can_find_by_pid() {
 }
 
 /// Pins `set_email_verification_sent`: it stamps the sent-at timestamp
-/// and generates a verification token (Loco scaffold; not the live flow).
+/// and generates a verification token (legacy scaffold; not the live flow).
 #[tokio::test]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with: cargo test -- --ignored"]
 #[serial]
@@ -231,7 +231,7 @@ async fn can_verified() {
 }
 
 /// Pins `reset_password`: it re-hashes and replaces the stored password
-/// so the new one verifies (Loco scaffold; unused by passwordless).
+/// so the new one verifies (legacy scaffold; unused by passwordless).
 #[tokio::test]
 #[ignore = "requires PostgreSQL (config/test.yaml); run with: cargo test -- --ignored"]
 #[serial]

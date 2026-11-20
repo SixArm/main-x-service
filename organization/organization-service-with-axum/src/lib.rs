@@ -42,7 +42,7 @@ pub mod fhir;
 /// Value frequencies for the matcher's match evidence
 /// (`agents/share/match-evidence.md` §7): the counted name-share table.
 pub mod frequencies;
-/// Loco initializers (currently empty; reserved for app-startup wiring).
+/// Initializers (currently empty; reserved for app-startup wiring).
 pub mod initializers;
 /// Pure record-merge logic (fold a duplicate into a survivor).
 pub mod merge;

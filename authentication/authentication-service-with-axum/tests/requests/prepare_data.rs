@@ -6,8 +6,8 @@ use axa::AppContext;
 use axa_test::TestServer;
 use axum::http::{HeaderName, HeaderValue};
 
-const USER_EMAIL: &str = "test@loco.com";
-const USER_NAME: &str = "loco";
+const USER_EMAIL: &str = "test@example.com";
+const USER_NAME: &str = "test";
 
 /// A signed-in test subject: the persisted `users` row plus the PASETO
 /// bearer token minted by redeeming their magic link.

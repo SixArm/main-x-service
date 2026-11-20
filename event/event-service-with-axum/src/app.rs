@@ -90,7 +90,7 @@ impl App {
         }
     }
 
-    /// Register loco-native routes: the framework defaults plus this
+    /// Register controller-style routes: the framework defaults plus this
     /// crate's `events`, FHIR `Appointment`, and `metrics` route groups.
     /// The hand-written Axum surface is merged separately in
     /// [`Self::after_routes`].

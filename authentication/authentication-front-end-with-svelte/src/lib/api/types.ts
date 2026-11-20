@@ -1,7 +1,7 @@
 // Types mirroring the Authentication Service responses.
 // Source of truth: authentication-service-with-axum/src/views/auth.rs.
 // These shapes must stay in lockstep with the Rust view structs; the
-// field names match the raw JSON the loco.rs service emits (no envelope).
+// field names match the raw JSON the service emits (no envelope).
 
 /**
  * Response body of `GET /api/auth/magic-link/{token}` — the verify step.

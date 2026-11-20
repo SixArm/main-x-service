@@ -52,7 +52,7 @@ pub mod auth;
 /// resource. Mounted by `app::App::routes`.
 pub mod controllers;
 
-/// Loco initializers — boot-time wiring run in a defined order: the five
+/// Initializers — boot-time wiring run in a defined order: the five
 /// upstream service clients, then the test/dev stubs, then auth last so
 /// its session guard wraps every other route.
 pub mod initializers;

@@ -1,6 +1,6 @@
 // Lean fetch wrapper for the Care Pathway Service.
 //
-// The service is a loco.rs app: handlers return RAW JSON (no
+// The service is an axa app: handlers return RAW JSON (no
 // {success,data,error} envelope), so this client returns the parsed
 // body directly and throws ApiError on non-2xx.
 //
@@ -126,7 +126,7 @@ export function nextLink(header: string | null): string | null {
 }
 
 /**
- * Lean JSON `fetch` wrapper for the loco.rs care-pathway service.
+ * Lean JSON `fetch` wrapper for the care-pathway service.
  *
  * The service returns RAW JSON (no `{success,data,error}` envelope), so
  * the verb helpers resolve the parsed body directly and throw

@@ -19,7 +19,7 @@ serde	Serialization framework for every wire type and the stored JSONB payload.	
 serde_json	JSON encoding/decoding, and the canonical form the audit hash chain digests.	Safety-relevant. Key ordering (BTreeMap, preserve_order disabled) is load-bearing for chain verification across a JSONB round-trip.
 tokio	Async runtime.	Safety-relevant. Runtime failure means service unavailability, not data corruption. Industry standard.
 async-trait	Async methods in traits (the relay's EventSink seam).	Not safety-relevant. Compile-time macro only, no runtime behaviour of its own.
-axum	HTTP server, extractors, and response types underneath loco.	Safety-relevant. Header and path extraction feed the auth guard and the purpose-of-use audit context.
+axum	HTTP server, extractors, and response types underneath axa.	Safety-relevant. Header and path extraction feed the auth guard and the purpose-of-use audit context.
 tracing	Structured logging and spans.	Security-relevant. The no-secrets-in-logs invariant is enforced at call sites, not by this crate.
 tracing-subscriber	Log formatting, filtering, and the JSON layer.	Security-relevant. Misconfiguration could emit more detail than intended; log level is deployment-controlled.
 getrandom	The OS random source for the per-process cursor-signing key when CURSOR_KEY is unset outside production.	Security-relevant. A weak key would let a caller forge page cursors; production requires CURSOR_KEY instead.

@@ -2,7 +2,7 @@
 //!
 //! The **reference implementation** of the family FHIR contract
 //! ([`agents/share/fhir.md`](../../../../agents/share/fhir.md)) — copied by
-//! the other loco-idiomatic entity services. It provides the bidirectional
+//! the other controller-style entity services. It provides the bidirectional
 //! mapping between the stored `organization_matcher::Organization` DTO and
 //! the wire-level [`resources::FhirOrganization`]: [`to_fhir_organization`]
 //! for outbound responses and [`from_fhir_organization`] for inbound

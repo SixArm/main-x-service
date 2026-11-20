@@ -15,7 +15,7 @@
 //!
 //! ## Two differences from the reference implementation
 //!
-//! Worker's `audit_log` predates the loco-style services and is shaped
+//! Worker's `audit_log` predates the controller-style services and is shaped
 //! differently, so this is a port rather than a copy:
 //!
 //! - **Order comes from `seq`, not the primary key.** The PK is an

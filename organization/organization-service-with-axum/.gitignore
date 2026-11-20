@@ -5,7 +5,7 @@
 # event/course). It holds no secret directly — every credential is a
 # Tera `{{ get_env(name="…") }}` call resolved from the environment at
 # boot, never a literal value — so there is nothing here that needs to
-# stay untracked. This crate's own loco scaffold ignored it by default
+# stay untracked. This crate's original scaffold ignored it by default
 # (`**/config/production.yaml`, removed here); that meant the file
 # never left this machine, so a boot-time bug in it (an unquoted empty
 # SMTP Tera default rendering as YAML null instead of "") went

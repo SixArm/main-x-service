@@ -279,7 +279,7 @@ async fn resign_audit(
 
 /// Walk the record table.
 ///
-/// Unlike the loco-shaped services, a record's digest covers its child
+/// Unlike the controller-style services, a record's digest covers its child
 /// tables too, so each row must be **assembled through the repository**
 /// before its pre-image can be computed — the same assembly
 /// `/api/records/verify` does. That is one query per row, which is why

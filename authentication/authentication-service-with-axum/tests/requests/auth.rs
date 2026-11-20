@@ -40,10 +40,10 @@ use super::prepare_data;
 #[ignore = "requires PostgreSQL (config/test.yaml); run with: cargo test -- --ignored"]
 async fn can_signup_and_issue_magic_link() {
     request::<App, _, _>(|request, ctx| async move {
-        let email = "test@loco.com";
+        let email = "test@example.com";
         let payload = serde_json::json!({
             "email": email,
-            "name": "loco",
+            "name": "test",
         });
 
         let response = request.post("/api/auth/signup").json(&payload).await;
@@ -52,7 +52,7 @@ async fn can_signup_and_issue_magic_link() {
         let user = users::Model::find_by_email(&ctx.db, email)
             .await
             .expect("signup should create the user");
-        assert_eq!(user.name, "loco");
+        assert_eq!(user.name, "test");
         assert!(
             user.magic_link_token.is_some(),
             "signup should issue a magic link token"
@@ -1307,8 +1307,8 @@ async fn signup_locale_does_not_change_the_response_shape() {
             serde_json::json!("not-a-locale"),
         ] {
             let payload = serde_json::json!({
-                "email": "locale-probe@loco.com",
-                "name": "loco",
+                "email": "locale-probe@example.com",
+                "name": "test",
                 "locale": locale,
             });
             let response = request.post("/api/auth/signup").json(&payload).await;

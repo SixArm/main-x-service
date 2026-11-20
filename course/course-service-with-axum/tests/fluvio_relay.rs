@@ -31,7 +31,7 @@
 //! integration suite drives the router directly via `tower::oneshot`
 //! against an env-configured `DB_URL`, see `tests/common/mod.rs`
 //! and `src/db/mod.rs`'s `outbox_atomicity_tests`), so this test follows
-//! that same shape rather than case's loco-request pattern: connect via
+//! that same shape rather than case's request-helper pattern: connect via
 //! `DB_URL`, drive the entity write through `PgCourseRepository`
 //! directly (which enqueues the outbox row in the same transaction under
 //! the outbox transport), then drain to a real `FluvioSink`.

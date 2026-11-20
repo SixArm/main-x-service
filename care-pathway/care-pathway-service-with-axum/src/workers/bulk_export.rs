@@ -19,7 +19,7 @@
 //! Postgres, and the bytes are in the artifact store — so a poll from any
 //! replica, at any time inside the retention window, answers correctly.
 //!
-//! Jobs run on `bg_pg` (`agents/share/loco.md`), the family's
+//! Jobs run on `bg_pg` (`agents/share/axa.md`), the family's
 //! Postgres-backed queue, so there is still no external broker.
 
 use axa::prelude::*;

@@ -6,7 +6,7 @@ import * as env from "$app/env/private";
 import { SESSION_COOKIE } from "./session";
 import type { CurrentUser } from "#lib/api/types.js";
 
-/** Authentication-service base URL (server-side; loco dev default 5150). */
+/** Authentication-service base URL (server-side; dev default 5150). */
 const AUTH_API_URL = env.AUTH_API_URL || "http://localhost:5150";
 
 type FetchFn = typeof fetch;

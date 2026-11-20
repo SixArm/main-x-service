@@ -206,7 +206,7 @@ impl App {
     }
 
     /// Register CLI tasks. None are registered; the inject marker is kept
-    /// so the Loco generator can splice tasks in later.
+    /// so tasks can be added here later.
     #[allow(unused_variables)]
     pub fn register_tasks(tasks: &mut Tasks) {
         tasks.register(crate::tasks::search::SearchReindex);

@@ -4,7 +4,7 @@
 //! This is a **passwordless** service: no login path ever checks a
 //! password. The `password` column exists only to satisfy `NOT NULL`,
 //! and `Model::create_passwordless` fills it with the hash of an
-//! unguessable random value. The loco-scaffold password/reset helpers
+//! unguessable random value. The legacy-scaffold password/reset helpers
 //! (`RegisterParams`, `Model::create_with_password`,
 //! `Model::reset_password`, …) are kept for parity with the axa
 //! template but are not wired into any route.
@@ -39,7 +39,7 @@ use validator::Validate;
 
 use super::{ModelError, ModelResult};
 
-/// A `users` row. Holds the magic-link credentials plus the loco-scaffold
+/// A `users` row. Holds the magic-link credentials plus the legacy-scaffold
 /// password/reset fields (unused by the passwordless flow). Note that
 /// `password`/`api_key`/`*_token` are **secrets**: views never serialise
 /// them (see [`crate::views::auth`]).
@@ -63,14 +63,14 @@ pub struct Model {
     pub api_key: String,
     /// Display name. Anonymised to a tombstone on GDPR erasure.
     pub name: String,
-    /// Password-reset token (Loco scaffold; unused by passwordless flow).
+    /// Password-reset token (legacy scaffold; unused by passwordless flow).
     pub reset_token: Option<String>,
-    /// When the reset token was sent (Loco scaffold; unused).
+    /// When the reset token was sent (legacy scaffold; unused).
     pub reset_sent_at: Option<DateTime<FixedOffset>>,
-    /// Email-verification token (Loco scaffold; unused — magic-link
+    /// Email-verification token (legacy scaffold; unused — magic-link
     /// redemption verifies the email instead).
     pub email_verification_token: Option<String>,
-    /// When the verification email was sent (Loco scaffold; unused).
+    /// When the verification email was sent (legacy scaffold; unused).
     pub email_verification_sent_at: Option<DateTime<FixedOffset>>,
     /// When the email was verified, if ever (set on first magic-link
     /// redemption).
@@ -191,7 +191,7 @@ pub fn attributes_to_value(map: &BTreeMap<String, Vec<String>>) -> serde_json::V
     serde_json::Value::Object(object)
 }
 
-/// Password-login params (Loco scaffold; unused in the passwordless flow).
+/// Password-login params (legacy scaffold; unused in the passwordless flow).
 #[derive(Debug, Deserialize, Serialize)]
 pub struct LoginParams {
     /// Account email.
@@ -200,7 +200,7 @@ pub struct LoginParams {
     pub password: String,
 }
 
-/// Password-registration params (Loco scaffold; unused — see
+/// Password-registration params (legacy scaffold; unused — see
 /// `Model::create_passwordless`).
 #[derive(Debug, Deserialize, Serialize)]
 pub struct RegisterParams {

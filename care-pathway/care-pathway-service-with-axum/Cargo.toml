@@ -167,7 +167,7 @@ axa = { version = "0.20", features = ["postgres-sqlx", "queue", "openapi", "open
 # explicitly so request tests can factor out helpers that take one (axa
 # re-exports the type, `axa::TestServer`, but not the `multipart`
 # module the native-bulk import tests need — `src/bulk/handlers.rs`'s
-# multipart upload). Pinned to the exact version loco-rs 1.1.0 depends on
+# multipart upload). Pinned to the exact version axa-test depends on
 # internally (matching organization-service's own pin) so this crate
 # does not carry two incompatible copies of `axum-test` at once — an
 # unrelated stale "21.1" pin here duplicated the crate until this fix;

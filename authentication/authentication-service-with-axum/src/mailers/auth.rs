@@ -3,7 +3,7 @@
 //! The **magic-link** email is the only one this crate sends: it is
 //! rendered from the dependency-light [`crate::i18n`] catalog (English
 //! + Welsh) so no templating engine or on-disk template is needed. The
-//! loco-scaffolded `welcome` / `forgot-password` mailer functions and
+//! legacy-scaffolded `welcome` / `forgot-password` mailer functions and
 //! their embedded template directories were removed (2026-09-06,
 //! `spec/index.md` §13) — the passwordless flow never checks a
 //! password and no route ever called them; see the CHANGELOG and

@@ -19,7 +19,7 @@
 //!
 //! ## Authorization — requires a bearer token (spec §16, decided)
 //!
-//! Unlike the equivalent endpoint on sibling loco-idiomatic services
+//! Unlike the equivalent endpoint on sibling controller-style services
 //! (e.g. case-service, behind its blanket `CASE_REQUIRE_AUTH` guard),
 //! this crate has **no blanket `/api/*` guard at all** — every other
 //! route here is gated per-handler (session cookie, PASETO bearer, or

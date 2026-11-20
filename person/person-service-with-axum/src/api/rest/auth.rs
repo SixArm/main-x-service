@@ -75,7 +75,7 @@ pub const DESTRUCTIVE_POST_SUFFIXES: [&str; 4] = ["/merge", "/deduplicate", "/im
 ///
 /// - `/api/health` — this service's own health endpoint (under `/api`);
 /// - `/_health/live` / `/_health/ready` / `/_health/startup` — axa's probe routes (present
-///   on the loco-mounted surface only);
+///   on the axa router only);
 /// - `/api-docs/openapi.json` — the `OpenAPI` 3 document;
 /// - `/metrics.prom` — the root-mounted Prometheus scrape path (outside
 ///   `/api`, but the middleware layers the whole router, so it is

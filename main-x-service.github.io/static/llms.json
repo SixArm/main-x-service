@@ -1,6 +1,6 @@
 {
   "name": "Main X Index (main-x-service)",
-  "summary": "A federated identity index: ~55 self-contained Rust crates (loco.rs backend services + SvelteKit operator front-ends), one per real-world entity (person, worker, place, thing, event, course, organization, care pathway, case, plan/portfolio), each doing CRUD, probabilistic + deterministic matching, full-text search, record merge, an audit trail, and event streaming \u2014 plus a central SSO provider, a cross-service link-graph aggregator, and five consumer applications that build on the registries.",
+  "summary": "A federated identity index: ~55 self-contained Rust crates (Axum backend services + SvelteKit operator front-ends), one per real-world entity (person, worker, place, thing, event, course, organization, care pathway, case, plan/portfolio), each doing CRUD, probabilistic + deterministic matching, full-text search, record merge, an audit trail, and event streaming \u2014 plus a central SSO provider, a cross-service link-graph aggregator, and five consumer applications that build on the registries.",
   "notes": "Each crate is self-contained (own REST API, own persistence, own matching algorithm) and shares an architecture and documentation layout, not code. Every subproject's spec/ directory is the single source of truth for that subproject; code conforms to the spec, not the reverse. This file describes the published documentation site (main-x-service.github.io), a curated front door \u2014 not the git checkout; every entry links to its GitHub source since the site itself renders only a handful of overview pages (see \"This site\" below).",
   "repository": [
     "https://github.com/SixArm/main-x-service",
@@ -148,7 +148,7 @@
       ]
     },
     {
-      "title": "Entity registry services (Rust, loco.rs)",
+      "title": "Entity registry services (Rust, Axum)",
       "items": [
         {
           "title": "person-service",
@@ -472,12 +472,12 @@
         {
           "title": "agents/share/axa.md",
           "url": "https://github.com/SixArm/main-x-service/blob/main/agents/share/axa.md",
-          "description": "The loco.rs framework conventions used family-wide"
+          "description": "The axa library conventions used family-wide"
         },
         {
           "title": "agents/share/rust-axum-stack.md",
           "url": "https://github.com/SixArm/main-x-service/blob/main/agents/share/rust-axum-stack.md",
-          "description": "The full Rust + loco dependency stack"
+          "description": "The full Rust + Axum dependency stack"
         },
         {
           "title": "agents/share/postgresql.md",

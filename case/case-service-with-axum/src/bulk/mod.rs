@@ -6,7 +6,7 @@
 //! background worker (axa `worker`), with **JSONL** as the lossless
 //! reference format and **CSV** as the operator/spreadsheet format. Ports
 //! the shape of the person service's `src/bulk/` (the family reference
-//! implementation) onto this crate's loco-idiomatic layout, where the API
+//! implementation) onto this crate's controller-style layout, where the API
 //! DTO **is** `case_matcher::Case` — stored verbatim as JSONB, with no
 //! separate service-owned domain model to convert to/from.
 //!

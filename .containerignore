@@ -3,7 +3,7 @@
 # Every service Containerfile in this monorepo builds from the
 # REPOSITORY ROOT (not its own crate directory), because each crate's
 # Cargo.toml depends on sibling crates by path — there is no root
-# Cargo.toml / shared vendor step (agents/share/rust-loco-stack.md).
+# Cargo.toml / shared vendor step (agents/share/rust-axum-stack.md).
 # Without this file, `podman build`/`docker build` would copy every
 # crate's `target/` directory (multi-gigabyte build artifacts per
 # crate, ~55 crates) into the build context, which is slow at best and

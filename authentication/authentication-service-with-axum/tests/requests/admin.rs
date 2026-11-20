@@ -71,7 +71,7 @@ async fn admin_can_replace_and_show_user_attributes() {
         let admin_token = sign_in_with_attributes(
             &request,
             &ctx,
-            "admin@loco.com",
+            "admin@example.com",
             serde_json::json!({ "access": ["admin"] }),
         )
         .await;
@@ -79,9 +79,9 @@ async fn admin_can_replace_and_show_user_attributes() {
         // A fresh target user with no attributes.
         request
             .post("/api/auth/signup")
-            .json(&serde_json::json!({ "email": "target@loco.com", "name": "target" }))
+            .json(&serde_json::json!({ "email": "target@example.com", "name": "target" }))
             .await;
-        let target_pid = users::Model::find_by_email(&ctx.db, "target@loco.com")
+        let target_pid = users::Model::find_by_email(&ctx.db, "target@example.com")
             .await
             .unwrap()
             .pid;
@@ -122,14 +122,14 @@ async fn admin_can_replace_and_show_user_attributes() {
         );
 
         // Persisted.
-        let updated = users::Model::find_by_email(&ctx.db, "target@loco.com")
+        let updated = users::Model::find_by_email(&ctx.db, "target@example.com")
             .await
             .unwrap();
         assert_eq!(updated.attrs()["access"], vec!["write".to_string()]);
         assert_eq!(updated.attrs()["dept"], vec!["cardiology".to_string()]);
 
         // Audited.
-        let events = auth_events::Model::for_subject(&ctx.db, target_pid, "target@loco.com")
+        let events = auth_events::Model::for_subject(&ctx.db, target_pid, "target@example.com")
             .await
             .unwrap();
         assert!(
@@ -151,7 +151,7 @@ async fn admin_can_replace_and_show_user_attributes() {
         // `attributes_viewed` row, distinct from the PUT's
         // `attributes_assigned` row asserted above.
         let events_after_get =
-            auth_events::Model::for_subject(&ctx.db, target_pid, "target@loco.com")
+            auth_events::Model::for_subject(&ctx.db, target_pid, "target@example.com")
                 .await
                 .unwrap();
         let viewed_count = events_after_get
@@ -176,11 +176,11 @@ async fn non_admin_token_is_forbidden() {
         let user_token = sign_in_with_attributes(
             &request,
             &ctx,
-            "plain@loco.com",
+            "plain@example.com",
             serde_json::json!({ "access": ["write"] }),
         )
         .await;
-        let pid = users::Model::find_by_email(&ctx.db, "plain@loco.com")
+        let pid = users::Model::find_by_email(&ctx.db, "plain@example.com")
             .await
             .unwrap()
             .pid;
