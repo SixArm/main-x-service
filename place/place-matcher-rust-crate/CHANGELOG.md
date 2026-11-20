@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed — a test that only ever took one branch
+
+- `phonetic_bonus_lifts_score_only_when_gate_clears` branched on the
+  phonetic score, and its pair (Catherine/Kathryn, different Soundex)
+  never cleared the gate, so the "bonus lifts the score" arm was never
+  checked. It is now two tests, each asserting its own precondition:
+  Smith/Smyth clears the gate and is lifted, Catherine/Kathryn does not.
+- Tests for a blank id on the second side, the name+postcode rule without
+  a name, every name algorithm, a missing phonetic score, a legacy
+  `MatchResult` without `confidence`, distinct scheme labels, and the
+  normaliser's non-ASCII and `00`-prefix paths. Lines 99.08% → 99.70%.
+
 ### Added — the demo binary is tested
 
 - `tests/demo.rs` runs the demo and checks each example shows what its

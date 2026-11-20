@@ -1119,4 +1119,33 @@ mod tests {
         let back: Evidence = serde_json::from_value(value).unwrap();
         assert!(back.components.is_empty());
     }
+
+    /// Every scheme has its own frequency label, and an `Other` name is
+    /// trimmed and lowercased so `"OSM "` and `"osm"` share counts.
+    #[test]
+    fn every_scheme_has_a_distinct_label() {
+        let schemes = [
+            PlaceIdScheme::Google,
+            PlaceIdScheme::OsmNode,
+            PlaceIdScheme::OsmWay,
+            PlaceIdScheme::OsmRelation,
+            PlaceIdScheme::GeoNames,
+            PlaceIdScheme::Wikidata,
+            PlaceIdScheme::Foursquare,
+            PlaceIdScheme::Here,
+            PlaceIdScheme::Mapbox,
+            PlaceIdScheme::Other(" Local ".into()),
+        ];
+        let labels: std::collections::HashSet<String> = schemes.iter().map(scheme_label).collect();
+        assert_eq!(labels.len(), schemes.len());
+        assert_eq!(
+            scheme_label(&PlaceIdScheme::Other(" Local ".into())),
+            "other:local"
+        );
+    }
+
+    #[test]
+    fn frequency_key_is_none_for_an_unknown_component() {
+        assert_eq!(frequency_key("not_a_component", "x"), None);
+    }
 }

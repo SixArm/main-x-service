@@ -1632,6 +1632,93 @@ mod tests {
         assert!(!MatchingEngine::default_config().deterministic_match(&a, &b));
     }
 
+    /// A blank id on the second side is skipped, so a real shared id
+    /// further along still matches (SEC-M2).
+    #[test]
+    fn blank_id_on_the_other_side_is_skipped() {
+        let id = |v: &str| PlaceId {
+            scheme: PlaceIdScheme::Google,
+            value: v.into(),
+        };
+        let a = Place::builder().add_place_id(id("ChIJ1")).build();
+        let b = Place::builder()
+            .place_ids(vec![id("  "), id("ChIJ1")])
+            .build();
+        let engine = MatchingEngine::default_config();
+        assert!(engine.deterministic_match(&a, &b));
+        let c = Place::builder().place_ids(vec![id("  ")]).build();
+        assert!(!engine.deterministic_match(&a, &c));
+    }
+
+    /// The name+postcode rule needs a name on both sides.
+    #[test]
+    fn name_and_postcode_rule_needs_both_names() {
+        let addr = Address {
+            postcode: Some("CF10 1AA".into()),
+            ..Address::default()
+        };
+        let named = Place::builder()
+            .name("Cardiff Castle")
+            .address(addr.clone())
+            .build();
+        let unnamed = Place::builder().address(addr).build();
+        assert!(!name_and_postcode_match(&named, &unnamed));
+        assert!(!name_and_postcode_match(&unnamed, &named));
+    }
+
+    /// Every name algorithm agrees on identical names, and `Exact` gives no
+    /// partial credit.
+    #[test]
+    fn each_name_algorithm_scores_names() {
+        for algorithm in [
+            SimilarityAlgorithm::JaroWinkler,
+            SimilarityAlgorithm::Levenshtein,
+            SimilarityAlgorithm::Exact,
+            SimilarityAlgorithm::Combined,
+        ] {
+            let engine = MatchingEngine::new(MatchConfig {
+                name_algorithm: algorithm,
+                ..MatchConfig::default()
+            });
+            assert!(approx_eq(
+                engine.score_name_pair("Tower Bridge", "tower bridge"),
+                1.0
+            ));
+            let near = engine.score_name_pair("Tower Bridge", "Tower Bridges");
+            if matches!(algorithm, SimilarityAlgorithm::Exact) {
+                assert!(near.abs() < f64::EPSILON, "exact gives no partial credit");
+            } else {
+                assert!(near > 0.5 && near < 1.0, "{algorithm:?} scored {near}");
+            }
+        }
+    }
+
+    /// With phonetic matching on, a place with no name has no phonetic
+    /// score rather than a zero one.
+    #[test]
+    fn phonetic_score_is_absent_without_names() {
+        let engine = MatchingEngine::new(MatchConfig {
+            use_phonetic_matching: true,
+            ..MatchConfig::default()
+        });
+        let named = Place::builder().name("Smith Square").build();
+        let unnamed = Place::builder().build();
+        let r = engine.match_places(&named, &unnamed);
+        assert!(r.breakdown.name_phonetic_score.is_none());
+    }
+
+    /// A `MatchResult` serialised before `confidence` existed reads back as
+    /// `Low`, flagged for re-scoring rather than trusted.
+    #[test]
+    fn legacy_result_without_confidence_reads_as_low() {
+        let engine = MatchingEngine::default_config();
+        let p = Place::builder().name("Big Ben").build();
+        let mut json = serde_json::to_value(engine.match_places(&p, &p)).expect("serialises");
+        json.as_object_mut().expect("object").remove("confidence");
+        let back: MatchResult = serde_json::from_value(json).expect("deserialises");
+        assert_eq!(back.confidence, Confidence::Low);
+    }
+
     #[test]
     fn deterministic_via_name_and_postcode() {
         let addr = Address::new().with_postcode("SW1A 2AA");
@@ -2005,52 +2092,57 @@ mod tests {
     // Pins spec.md §5.2.2 — the phonetic bonus (score*0.05, weight 0.05) is
     // only applied when name_phonetic_score > 0.9. Compare the same place
     // pair with the bonus arithmetically engaged vs not.
+    fn phonetic_on_and_off(a: &str, b: &str) -> (MatchResult, MatchResult) {
+        let (p, q) = (
+            Place::builder().name(a).build(),
+            Place::builder().name(b).build(),
+        );
+        let with = |use_phonetic_matching| {
+            MatchingEngine::new(MatchConfig {
+                use_phonetic_matching,
+                ..MatchConfig::default()
+            })
+            .match_places(&p, &q)
+        };
+        (with(true), with(false))
+    }
+
+    // Pins spec.md §5.2.2 — the phonetic bonus (score*0.05, weight 0.05) is
+    // only applied when name_phonetic_score > 0.9. Each case asserts its own
+    // precondition, so neither can pass without exercising its branch (an
+    // earlier single test branched on the score and only ever took one arm).
     #[test]
-    fn phonetic_bonus_lifts_score_only_when_gate_clears() {
-        // Names that sound alike (shared Soundex) but score < 1.0 literally,
-        // so the phonetic bonus has room to lift the renormalised score.
-        let p = Place::builder().name("Catherine").build();
-        let q = Place::builder().name("Kathryn").build();
-
-        let off = MatchingEngine::new(MatchConfig {
-            use_phonetic_matching: false,
-            ..MatchConfig::default()
-        })
-        .match_places(&p, &q);
-
-        let on = MatchingEngine::new(MatchConfig {
-            use_phonetic_matching: true,
-            ..MatchConfig::default()
-        })
-        .match_places(&p, &q);
-
-        // With phonetic off there is no phonetic sub-score at all.
+    fn phonetic_bonus_lifts_score_when_gate_clears() {
+        // Same Soundex (S530), different spelling: the bonus has room to lift.
+        let (on, off) = phonetic_on_and_off("Smith", "Smyth");
         assert!(off.breakdown.name_phonetic_score.is_none());
-
-        // With phonetic on the gating sub-score is present.
         let phon = on
             .breakdown
             .name_phonetic_score
-            .expect("phonetic score present when enabled");
+            .expect("present when enabled");
+        assert!(phon > 0.9, "pair must clear the gate, scored {phon}");
+        assert!(
+            on.score > off.score,
+            "gate fired so {} should exceed {}",
+            on.score,
+            off.score
+        );
+    }
 
-        if phon > 0.9 {
-            // Gate fires: the bonus is added with positive weight, so the
-            // renormalised score is strictly higher than with the gate off.
-            assert!(
-                on.score > off.score,
-                "gate fired (phon={phon}) so on.score ({}) should exceed off.score ({})",
-                on.score,
-                off.score
-            );
-        } else {
-            // Gate does not fire: the only-name pair has identical
-            // participating weights, so the score is unchanged.
-            assert!(
-                approx_eq(on.score, off.score),
-                "gate did not fire (phon={phon}) so scores should be equal: {} vs {}",
-                on.score,
-                off.score
-            );
-        }
+    #[test]
+    fn phonetic_bonus_leaves_score_alone_below_the_gate() {
+        // Different Soundex (C365 vs K365): the gate stays shut.
+        let (on, off) = phonetic_on_and_off("Catherine", "Kathryn");
+        let phon = on
+            .breakdown
+            .name_phonetic_score
+            .expect("present when enabled");
+        assert!(phon <= 0.9, "pair must stay below the gate, scored {phon}");
+        assert!(
+            approx_eq(on.score, off.score),
+            "gate shut so scores should be equal: {} vs {}",
+            on.score,
+            off.score
+        );
     }
 }

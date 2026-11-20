@@ -1974,4 +1974,54 @@ mod tests {
             Some("+447700900123".to_string()),
         );
     }
+
+    // ---------- edge paths the doctests show but coverage does not count ----------
+
+    #[test]
+    fn house_number_takes_a_single_letter_suffix_only() {
+        let p = Normalizer::parse_address_line("10A Downing St");
+        assert_eq!(p.house_number.as_deref(), Some("10A"));
+        let p = Normalizer::parse_address_line("10 Apple Tree Lane");
+        assert_eq!(
+            p.house_number.as_deref(),
+            Some("10"),
+            "the street is not a suffix"
+        );
+    }
+
+    #[test]
+    fn a_unit_needs_a_known_ascii_keyword_and_an_identifier() {
+        let p = Normalizer::parse_address_line("Flat 2A, 10 Downing Street");
+        assert_eq!(p.unit.as_deref(), Some("flat 2a"));
+        // No identifier after the keyword.
+        assert_eq!(
+            Normalizer::parse_address_line("Flat #, 10 Downing St").unit,
+            None
+        );
+        // A non-ASCII word is never a unit keyword.
+        assert_eq!(
+            Normalizer::parse_address_line("Wöhnung 3, Hauptstraße 1").unit,
+            None
+        );
+    }
+
+    #[test]
+    fn non_ascii_tokens_pass_through_abbreviation_expansion() {
+        assert_eq!(
+            Normalizer::expand_street_abbreviations("12 Straße"),
+            "12 Straße"
+        );
+    }
+
+    #[test]
+    fn e164_needs_an_ascii_default_country_and_finds_00_prefixes() {
+        assert_eq!(
+            Normalizer::normalize_phone_e164("07700 900123", Some("ÜK")),
+            None
+        );
+        assert_eq!(
+            Normalizer::normalize_phone_e164("0044 7700 900123", None).as_deref(),
+            Some("+447700900123")
+        );
+    }
 }
