@@ -2590,6 +2590,24 @@
   gate** (framed in `agents/share/security.md` §4 from SEC-I4). The generic
   flag-off `enforce` pin already exists family-wide; this adds the explicit,
   sensitive-path-named form on the flagged services. Feeds OPS-1 runbook.
+- [ ] **SEC-G9 (M) 🔴** FHIR writes skip the record-level decision. *(found
+  2026-11-20, raising worker-service coverage)* `PUT` and `DELETE` on
+  each service's REST surface load the stored record and run
+  `authorize_record` on its `resource.*` attributes before writing; the
+  FHIR `update` / `delete` handlers do not, so a record-level policy (for
+  example "no writes to an inactive worker") is enforced on `/api/…` and
+  bypassed on `/fhir/…` (security invariant 5, `fhir.md` §8). The blanket
+  guard still applies. Verified on worker: with such a policy, `PUT
+  /fhir/Practitioner/{id}` on an inactive worker returned `200` and
+  changed it. Per service:
+  - [x] worker — fixed 2026-11-20 (`authorize_stored_write`; also turns an
+    unknown id from `500` into `404 not-found`). `tests/fhir_write_abac.rs`
+    fails without the fix.
+  - [ ] person — `update_fhir_patient` / `delete_fhir_patient`.
+  - [ ] organization — `controllers/fhir.rs` `update` / `remove`.
+  - [ ] care-pathway — `controllers/fhir.rs` `update` / `remove`.
+  - [ ] case — `controllers/fhir.rs` `update` / `remove` (highest
+    sensitivity: `subject_of`).
 - [x] **SEC-G9 (S) 🟠** Masking left emergency contacts' phone numbers
   whole. *(found and done 2026-11-09)* Person's and worker's
   `mask_person` / `mask_worker` mask the subject's phone, SMS and fax

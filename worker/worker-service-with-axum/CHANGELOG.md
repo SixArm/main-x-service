@@ -8,6 +8,17 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ## [Unreleased]
 
+### Fixed — FHIR writes take the record-level decision (SEC-G9)
+
+- `PUT` and `DELETE /fhir/Practitioner/{id}` went straight to the
+  repository, skipping the `authorize_record` check the REST writes run on
+  the stored worker, so a `resource.*` policy (e.g. no writes to an
+  inactive worker) was enforced on `/api/workers` and bypassed on `/fhir`.
+  They now load the worker, refuse with an `OperationOutcome` when the
+  policy does, and answer `404 not-found` for an unknown id instead of a
+  `500`. New tests cover FHIR create/update/search/delete and
+  `/fhir/metadata`.
+
 ### Added — HTTP tests for reading, changing and deleting assessments
 
 - `tests/assessments_http.rs`: `GET`, `PUT` and `DELETE

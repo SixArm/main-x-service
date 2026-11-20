@@ -216,8 +216,45 @@ pub async fn create_fhir_worker(
     }
 }
 
-/// `PUT /fhir/Practitioner/{id}` — parses the body, forces its id to the path
-/// id, updates, re-indexes, and returns the updated resource (`200`).
+/// The record-level decision a write takes before it touches the row, as
+/// `PUT` / `DELETE /api/workers/{id}` take it: load the stored worker
+/// (`404` if there is none) and authorise `action` on its attributes, so a
+/// `resource.*` policy holds on the FHIR surface as it does on REST
+/// (security invariant 5, `agents/share/fhir.md` §8).
+async fn authorize_stored_write(
+    state: &AppState,
+    id: Uuid,
+    caller: &MaybeAuthUser,
+    action: Action,
+) -> Result<(), Box<Response>> {
+    let decision: Result<(), Response> = match state.worker_repository.get_by_id(&id).await {
+        Ok(Some(existing)) => authorize_record(caller, action, &worker_resource_attrs(&existing))
+            .map(|_| ())
+            .map_err(|(status, reason)| {
+                let code = if status == StatusCode::UNAUTHORIZED {
+                    "login"
+                } else {
+                    "forbidden"
+                };
+                fhir_error(status, code, &reason)
+            }),
+        Ok(None) => Err(fhir_json(
+            StatusCode::NOT_FOUND,
+            &FhirOperationOutcome::not_found("Practitioner", &id.to_string()),
+        )),
+        Err(e) => Err(fhir_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "database-error",
+            &e.to_string(),
+        )),
+    };
+    decision.map_err(Box::new)
+}
+
+/// `PUT /fhir/Practitioner/{id}` — parses the body, takes the record-level
+/// decision on the stored worker ([`authorize_stored_write`]: `404` if
+/// unknown, `403` if refused), forces the body's id to the path id, updates,
+/// re-indexes, and returns the updated resource (`200`).
 pub async fn update_fhir_worker(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
@@ -235,6 +272,9 @@ pub async fn update_fhir_worker(
             );
         }
     };
+    if let Err(refused) = authorize_stored_write(&state, id, &caller, Action::Write).await {
+        return *refused;
+    }
     match from_fhir_worker(&fhir_worker) {
         Ok(mut worker) => {
             worker.id = id;
@@ -260,14 +300,18 @@ pub async fn update_fhir_worker(
     }
 }
 
-/// `DELETE /fhir/Practitioner/{id}` — soft-deletes the worker, returning `204`
-/// (empty body) or a `database-error` outcome (`500`).
+/// `DELETE /fhir/Practitioner/{id}` — takes the record-level decision on the
+/// stored worker ([`authorize_stored_write`]: `404` if unknown, `403` if
+/// refused), then soft-deletes it, returning `204` (empty body).
 pub async fn delete_fhir_worker(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
     caller: MaybeAuthUser,
     client: ClientAddr,
 ) -> Response {
+    if let Err(refused) = authorize_stored_write(&state, id, &caller, Action::Delete).await {
+        return *refused;
+    }
     match state
         .worker_repository
         .delete(&id, &audit_context_of(&caller, client))
