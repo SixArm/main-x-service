@@ -10,6 +10,19 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — tests for OIDC provisioning and the SMTP settings
+
+- The OIDC callback's account decision had no test for an unknown
+  identity. Two now drive it against the stub IdP: with JIT provisioning
+  off (the default) the callback answers `403`, audits `no_account` and
+  creates nothing — provisioning regardless of the setting fails this
+  test; with JIT on it creates the account and bridges.
+- The mailer reads its SMTP settings and sender through a lookup, so they
+  are unit-tested without the environment: production sends by default
+  and nothing else does, `SMTP_ENABLE` overrides either way, defaults are
+  `localhost:587` STARTTLS, a bad port falls back, both transports build
+  offline, and a malformed address is reported before sending.
+
 ### Added — tests for the `user_attributes` task and handler edge branches
 
 - `tests/tasks/mod.rs` said the service registered no tasks; it has had

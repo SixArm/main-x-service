@@ -47,7 +47,16 @@ impl Smtp {
     /// `SMTP_ENABLE` overrides that, so development and test stay offline
     /// unless asked otherwise.
     fn from_env(environment: &axa::Environment) -> Option<Self> {
-        let var = |name: &str| std::env::var(name).ok().filter(|value| !value.is_empty());
+        Self::from_lookup(environment, |name| std::env::var(name).ok())
+    }
+
+    /// [`Self::from_env`] through `lookup`, so it can be tested without the
+    /// process environment.
+    fn from_lookup(
+        environment: &axa::Environment,
+        lookup: impl Fn(&str) -> Option<String>,
+    ) -> Option<Self> {
+        let var = |name: &str| lookup(name).filter(|value| !value.is_empty());
         let enabled = var("SMTP_ENABLE").map_or_else(
             || environment.is_production_like(),
             |value| matches!(value.as_str(), "1" | "true" | "yes" | "on"),
@@ -78,9 +87,20 @@ impl Smtp {
     }
 }
 
-/// Build the multipart message.
+/// Build the multipart message, from `MAIL_FROM` or [`DEFAULT_FROM`].
 fn message(to: &str, subject: String, text: String, html: String) -> Result<Message> {
     let from = std::env::var("MAIL_FROM").unwrap_or_else(|_| DEFAULT_FROM.to_string());
+    message_from(&from, to, subject, text, html)
+}
+
+/// [`message`] with the sender given.
+fn message_from(
+    from: &str,
+    to: &str,
+    subject: String,
+    text: String,
+    html: String,
+) -> Result<Message> {
     Message::builder()
         .from(from.parse().map_err(Error::wrap)?)
         .to(to.parse().map_err(Error::wrap)?)
@@ -139,5 +159,134 @@ impl Emailer {
             }
         });
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{DEFAULT_FROM, Smtp, message_from};
+
+    fn lookup(pairs: &[(&str, &str)]) -> impl Fn(&str) -> Option<String> {
+        let pairs: Vec<(String, String)> = pairs
+            .iter()
+            .map(|(k, v)| ((*k).to_string(), (*v).to_string()))
+            .collect();
+        move |name| {
+            pairs
+                .iter()
+                .find(|(k, _)| k == name)
+                .map(|(_, v)| v.clone())
+        }
+    }
+
+    /// Only production sends by default; development and test stay offline.
+    #[test]
+    fn sending_defaults_on_in_production_only() {
+        assert!(Smtp::from_lookup(&axa::Environment::Production, lookup(&[])).is_some());
+        assert!(Smtp::from_lookup(&axa::Environment::Development, lookup(&[])).is_none());
+        assert!(Smtp::from_lookup(&axa::Environment::Test, lookup(&[])).is_none());
+    }
+
+    /// `SMTP_ENABLE` overrides the environment in either direction.
+    #[test]
+    fn smtp_enable_overrides_the_environment() {
+        for on in ["1", "true", "yes", "on"] {
+            let s = Smtp::from_lookup(
+                &axa::Environment::Development,
+                lookup(&[("SMTP_ENABLE", on)]),
+            );
+            assert!(s.is_some(), "{on}");
+        }
+        let off = Smtp::from_lookup(
+            &axa::Environment::Production,
+            lookup(&[("SMTP_ENABLE", "false")]),
+        );
+        assert!(off.is_none(), "production can be kept offline");
+        let blank = Smtp::from_lookup(
+            &axa::Environment::Development,
+            lookup(&[("SMTP_ENABLE", "")]),
+        );
+        assert!(blank.is_none(), "a blank value is unset, not on");
+    }
+
+    #[test]
+    fn defaults_are_localhost_587_starttls_no_credentials() {
+        let s = Smtp::from_lookup(&axa::Environment::Production, lookup(&[])).unwrap();
+        assert_eq!(
+            (s.host.as_str(), s.port, s.secure),
+            ("localhost", 587, true)
+        );
+        assert!(s.credentials.is_none());
+    }
+
+    #[test]
+    fn settings_are_read_and_a_bad_port_falls_back() {
+        let s = Smtp::from_lookup(
+            &axa::Environment::Production,
+            lookup(&[
+                ("SMTP_HOST", "smtp.example.com"),
+                ("SMTP_PORT", "2525"),
+                ("SMTP_SECURE", "false"),
+                ("SMTP_USER", "mailer"),
+                ("SMTP_PASSWORD", "pw"),
+            ]),
+        )
+        .unwrap();
+        assert_eq!(
+            (s.host.as_str(), s.port, s.secure),
+            ("smtp.example.com", 2525, false)
+        );
+        assert_eq!(
+            s.credentials,
+            Some(("mailer".to_string(), "pw".to_string()))
+        );
+        let bad = Smtp::from_lookup(
+            &axa::Environment::Production,
+            lookup(&[("SMTP_PORT", "not-a-port"), ("SMTP_USER", "mailer")]),
+        )
+        .unwrap();
+        assert_eq!(bad.port, 587);
+        assert_eq!(bad.credentials, Some(("mailer".to_string(), String::new())));
+    }
+
+    /// Building a transport does no I/O, so both modes build offline.
+    #[test]
+    fn transport_builds_with_and_without_starttls() {
+        let mut s = Smtp::from_lookup(
+            &axa::Environment::Production,
+            lookup(&[("SMTP_USER", "mailer"), ("SMTP_PASSWORD", "pw")]),
+        )
+        .unwrap();
+        assert!(s.transport().is_ok(), "STARTTLS relay");
+        s.secure = false;
+        assert!(s.transport().is_ok(), "plain relay");
+    }
+
+    #[test]
+    fn a_malformed_address_is_reported_before_sending() {
+        let ok = message_from(
+            DEFAULT_FROM,
+            "a@example.com",
+            "s".into(),
+            "t".into(),
+            "h".into(),
+        );
+        assert!(ok.is_ok());
+        let bad_to = message_from(
+            DEFAULT_FROM,
+            "not an address",
+            "s".into(),
+            "t".into(),
+            "h".into(),
+        );
+        assert!(bad_to.is_err());
+        let bad_from = message_from(
+            "nobody",
+            "a@example.com",
+            "s".into(),
+            "t".into(),
+            "h".into(),
+        );
+        assert!(bad_from.is_err());
     }
 }

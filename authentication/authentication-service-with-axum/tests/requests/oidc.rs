@@ -502,3 +502,106 @@ async fn callback_without_a_flow_cookie_is_refused() {
     .await;
     clear_oidc_env();
 }
+
+/// Drive login, then a callback carrying a signed ID token for `email`,
+/// and return the callback response.
+async fn callback_for(
+    request: &TestServer,
+    issuer: &str,
+    stub: &StubState,
+    email: &str,
+) -> axum_test::TestResponse {
+    let login = request.get("/api/auth/oidc/login").await;
+    let location = login.header("location").to_str().unwrap().to_string();
+    let query: std::collections::HashMap<_, _> = url::Url::parse(&location)
+        .unwrap()
+        .query_pairs()
+        .into_owned()
+        .collect();
+    let flow_cookie = login
+        .header("set-cookie")
+        .to_str()
+        .unwrap()
+        .split(';')
+        .next()
+        .unwrap()
+        .to_string();
+    let now = chrono::Utc::now().timestamp();
+    let claims = json!({
+        "iss": issuer, "sub": "idp-subject-jit", "aud": "test-client",
+        "exp": now + 300, "iat": now, "nonce": query["nonce"],
+        "email": email, "email_verified": true,
+    });
+    *stub.id_token.lock().expect("lock") = Some(sign_id_token(&claims, "test-kid"));
+    request
+        .get(&format!(
+            "/api/auth/oidc/callback?code=stub-code&state={}",
+            query["state"]
+        ))
+        .add_header(
+            axum::http::header::COOKIE,
+            flow_cookie.parse::<axum::http::HeaderValue>().unwrap(),
+        )
+        .await
+}
+
+/// The shipped default: an IdP identity with no local account is refused
+/// with a named `403`, the refusal is audited, and no account is created.
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test --features oidc -- --ignored`"]
+async fn callback_refuses_an_unknown_identity_when_jit_is_off() {
+    use authentication_service::models::{auth_events::Model as AuthEvent, users};
+
+    let (issuer, stub) = serve_stub_idp().await;
+    set_oidc_env(
+        &issuer,
+        "http://localhost:3000/api/auth/oidc/callback",
+        None,
+        false,
+    );
+    request::<App, _, _>(|request, ctx| async move {
+        let email = "stranger@example.com";
+        let response = callback_for(&request, &issuer, &stub, email).await;
+        assert_eq!(response.status_code(), 403, "{}", response.text());
+        assert!(
+            users::Model::find_by_email(&ctx.db, email).await.is_err(),
+            "no account made"
+        );
+        let audited = AuthEvent::recent(&ctx.db, 50)
+            .await
+            .unwrap()
+            .into_iter()
+            .any(|e| e.event == "oidc_sign_in" && e.detail.as_deref() == Some("no_account"));
+        assert!(audited, "the refusal is audited");
+    })
+    .await;
+    clear_oidc_env();
+}
+
+/// With JIT opted in, the same identity gets an account and the bridge.
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with `cargo test --features oidc -- --ignored`"]
+async fn callback_provisions_an_unknown_identity_when_jit_is_on() {
+    use authentication_service::models::users;
+
+    let (issuer, stub) = serve_stub_idp().await;
+    set_oidc_env(
+        &issuer,
+        "http://localhost:3000/api/auth/oidc/callback",
+        None,
+        true,
+    );
+    request::<App, _, _>(|request, ctx| async move {
+        let email = "newcomer@example.com";
+        let response = callback_for(&request, &issuer, &stub, email).await;
+        assert_eq!(response.status_code(), 303, "{}", response.text());
+        assert!(
+            users::Model::find_by_email(&ctx.db, email).await.is_ok(),
+            "account provisioned"
+        );
+    })
+    .await;
+    clear_oidc_env();
+}
