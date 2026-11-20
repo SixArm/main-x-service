@@ -8,6 +8,14 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ## [Unreleased]
 
+### Added — GDPR residency and lawful-basis declarations (NW-6)
+
+- `WORKER_DATA_RESIDENCY`, `WORKER_LAWFUL_BASIS`, `WORKER_ART9_CONDITION` and
+  `WORKER_TRANSFER_SAFEGUARD`, each `undeclared` until set, are reported under
+  `data_protection` at `GET /api/compliance` and recorded on every audited
+  access, with `cross_border: true` when `X-Destination-Region` lies outside
+  the declared residency. They record; they do not block.
+
 ### Fixed — FHIR reads are audited (T-27)
 
 - With `WORKER_AUDIT_READS` on, `GET /fhir/Practitioner/{id}` writes the

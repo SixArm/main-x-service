@@ -1,5 +1,7 @@
 ## 13. Tasks
 
+- [x] **NW-6 — GDPR residency and lawful-basis declarations.** *(done 2026-11-20)* `DataProtection` in `src/compliance/mod.rs`, ported from care-pathway: `PERSON_DATA_RESIDENCY`, `PERSON_LAWFUL_BASIS`, `PERSON_ART9_CONDITION`, `PERSON_TRANSFER_SAFEGUARD`, reported under `data_protection` at `GET /api/compliance` and stamped on each audited access with a `cross_border` flag (repo `tasks.md` NW-6, NHS Wales NWS-H1). Read through a lookup so tests need no process environment. Verified by unit tests (conservative cross-border rule, including `ukraine` not being inside `uk`), the DB suites, and the integration test on `GET /api/compliance`; the same code is verified live in worker. Also corrects the module docs, which still listed erasure and record integrity as not adopted.
+
 - [x] **2026-09-07 — prost 0.13 → 0.14 / tonic 0.12 → 0.14 migration.**
   A Dependabot `prost` bump exposed that tonic 0.12 cannot compile
   against prost 0.14 generated code (60 `E0277`/well-formedness errors

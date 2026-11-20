@@ -174,17 +174,36 @@ impl AccessContext {
         SECONDARY_USE_PURPOSES.contains(&self.purpose.as_str())
     }
 
+    /// Whether this access sends data outside the declared residency
+    /// region — a GDPR Ch. V transfer.
+    #[must_use]
+    pub fn is_cross_border(&self) -> bool {
+        super::DataProtection::get().is_cross_border(self.destination.as_deref())
+    }
+
     /// The JSON recorded in `audit_logs.context`: what the caller declared,
     /// plus the deployment's standing declarations, plus the derived
     /// classifications — so a row is interpretable years later without
     /// knowing what the environment held at the time.
     #[must_use]
     pub fn to_json(&self) -> serde_json::Value {
+        self.to_json_under(super::DataProtection::get())
+    }
+
+    /// [`Self::to_json`] under a given declaration, so it can be tested
+    /// without the process environment.
+    #[must_use]
+    pub fn to_json_under(&self, dp: &super::DataProtection) -> serde_json::Value {
         serde_json::json!({
             "purpose_of_use": self.purpose,
             "recipient": self.recipient,
             "destination": self.destination,
             "secondary_use": self.is_secondary_use(),
+            "cross_border": dp.is_cross_border(self.destination.as_deref()),
+            "residency": dp.residency,
+            "lawful_basis": dp.lawful_basis,
+            "art9_condition": dp.art9_condition,
+            "transfer_safeguard": dp.transfer_safeguard,
         })
     }
 }
@@ -459,12 +478,29 @@ mod tests {
         assert_eq!(json["recipient"], "University");
         assert_eq!(json["secondary_use"], true);
         assert_eq!(json["destination"], "us-east-1");
-        // The GDPR standing declarations arrive with §8.5 steps 4-5;
-        // emitting empty placeholders now would imply a posture this
-        // deployment has not declared.
-        for absent in ["residency", "lawful_basis", "art9_condition"] {
-            assert!(json.get(absent).is_none(), "{absent} is not claimed yet");
-        }
+    }
+
+    /// The standing declarations ride on every row, and a destination
+    /// outside the declared region is marked as a Ch. V transfer.
+    #[test]
+    fn context_json_records_residency_and_transfer() {
+        let uk = super::super::DataProtection::from_lookup(|name| match name {
+            "PERSON_DATA_RESIDENCY" => Some("uk".to_string()),
+            "PERSON_ART9_CONDITION" => Some("employment".to_string()),
+            _ => None,
+        });
+        let abroad = AccessContext::from_parts(Some("research"), None, Some("us-east-1"));
+        let json = abroad.to_json_under(&uk);
+        assert_eq!(json["cross_border"], true);
+        assert_eq!(json["residency"], "uk");
+        assert_eq!(json["art9_condition"], "employment");
+        assert_eq!(json["lawful_basis"], super::super::UNDECLARED);
+        assert_eq!(json["transfer_safeguard"], super::super::UNDECLARED);
+
+        let home = AccessContext::from_parts(Some("research"), None, Some("uk-south"));
+        assert_eq!(home.to_json_under(&uk)["cross_border"], false);
+        let unnamed = AccessContext::from_parts(Some("research"), None, None);
+        assert_eq!(unnamed.to_json_under(&uk)["cross_border"], false);
     }
 
     /// Both fail modes are reachable and distinct, and the default is

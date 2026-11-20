@@ -322,6 +322,17 @@ organization and case have `_BULK_ARTIFACT_DIR` but no S3 vars at all
 | `<P>_AUDIT_READS` | off | Record an audit row on read/disclosure, not just mutation |
 | `<P>_AUDIT_FAIL_CLOSED` | off | Fail the read itself if its audit row can't be written |
 
+**Data-protection declarations** (person, worker, care-pathway): each is
+`undeclared` until set, reported under `data_protection` at
+`GET /api/compliance` and stamped on every audited access.
+
+| Variable | Default | Effect |
+|---|---|---|
+| `<P>_DATA_RESIDENCY` | `undeclared` | GDPR Ch. V region the data is confined to (e.g. `uk`); an access whose `X-Destination-Region` lies outside it is recorded `cross_border: true`. Records, does not block |
+| `<P>_LAWFUL_BASIS` | `undeclared` | GDPR Art. 6 basis |
+| `<P>_ART9_CONDITION` | `undeclared` | GDPR Art. 9(2) condition for special-category data |
+| `<P>_TRANSFER_SAFEGUARD` | `undeclared` | GDPR Ch. V transfer safeguard |
+
 **Portfolio-only** (no other crate has these — domain-specific to the
 plan/task/goal/burndown surface):
 

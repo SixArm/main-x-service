@@ -2360,6 +2360,10 @@ pub struct ComplianceIdentification {
     pub build: crate::compliance::Build,
     /// Whether the artefact carries reproducible-release evidence.
     pub reproducible_release: bool,
+    /// The declared data-protection posture: residency (GDPR Ch. V), lawful
+    /// basis (Art. 6) and special-category condition (Art. 9), each
+    /// `undeclared` until the deployment sets it.
+    pub data_protection: crate::compliance::DataProtection,
     /// What this service does **not** claim, stated so an assessment does
     /// not have to infer it from silence.
     pub not_claimed: Vec<&'static str>,
@@ -2374,7 +2378,11 @@ impl ComplianceIdentification {
             service: env!("CARGO_PKG_NAME"),
             build,
             reproducible_release: build.is_reproducible_release(),
+            data_protection: crate::compliance::DataProtection::get().clone(),
             not_claimed: vec![
+                "Enforcement of a cross-border block: the residency declaration \
+                 records an export leaving the region as a transfer, it does not \
+                 refuse it.",
                 "IEC 62304 safety classification: serving a FHIR Patient representation \
                  does not make this a medical device. No output drives an individual's \
                  treatment and no patient's clinical progress is tracked here \

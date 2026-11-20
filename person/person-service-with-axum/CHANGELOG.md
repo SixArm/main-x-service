@@ -8,6 +8,14 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ## [Unreleased]
 
+### Added — GDPR residency and lawful-basis declarations (NW-6)
+
+- `PERSON_DATA_RESIDENCY`, `PERSON_LAWFUL_BASIS`, `PERSON_ART9_CONDITION` and
+  `PERSON_TRANSFER_SAFEGUARD`, each `undeclared` until set, are reported under
+  `data_protection` at `GET /api/compliance` and recorded on every audited
+  access, with `cross_border: true` when `X-Destination-Region` lies outside
+  the declared residency. They record; they do not block.
+
 ### Compliance — FHIR reads are audited (T-44)
 
 - `GET /fhir/Patient/{id}`, `GET /fhir/Person/{id}` and FHIR search now

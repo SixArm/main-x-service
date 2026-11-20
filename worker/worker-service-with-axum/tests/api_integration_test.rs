@@ -1615,6 +1615,11 @@ async fn test_compliance_identification_is_mounted() {
     assert!(body_str.contains("worker-service"));
     // The absent medical-device classification is stated, not implied.
     assert!(body_str.contains("IEC 62304"));
+    // NWS-H1: the residency declaration is readable off the running
+    // service; with nothing set it says so rather than implying a region.
+    let json: serde_json::Value = serde_json::from_str(&body_str).unwrap();
+    assert!(json["data_protection"]["residency"].is_string());
+    assert!(json["data_protection"]["art9_condition"].is_string());
 }
 
 /// `GET /api/compliance/sbom` names every dependency's exact version, so

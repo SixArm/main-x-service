@@ -14,13 +14,10 @@
 //!
 //! | Framework | Module |
 //! |---|---|
-//! | **HIPAA** — audit controls, integrity | [`audit_chain`] |
+//! | **HIPAA** — audit controls, integrity | [`audit_chain`], [`record_integrity`], [`mac`], [`checkpoint`] |
 //! | **HIPAA** — read/disclosure auditing (§164.312(b), §164.528) | [`disclosure`] |
-//!
-//! **Not yet adopted** (§8.5 steps 4–5): the GDPR residency and
-//! lawful-basis declarations, Art. 17 erasure by redaction, and row-level
-//! record integrity. Claiming those before the code exists would be worse
-//! than shipping in steps.
+//! | **GDPR** — Art. 17 erasure that survives the chain | [`erasure`] |
+//! | **GDPR** — Ch. V residency, Art. 6 / Art. 9 declarations | [`DataProtection`] (this module) |
 //!
 //! ## Configuration
 //!
@@ -28,10 +25,19 @@
 //! |---|---|---|
 //! | `PERSON_AUDIT_READS` | off | Write an audit row for reads / searches / exports (HIPAA §164.312(b)). |
 //! | `PERSON_AUDIT_FAIL_CLOSED` | off | Refuse a read (`503`) when its audit row cannot be written, rather than serving data unaccounted for. |
+//! | `PERSON_DATA_RESIDENCY` | `undeclared` | The region this deployment's data is confined to (GDPR Ch. V), e.g. `uk`. |
+//! | `PERSON_LAWFUL_BASIS` | `undeclared` | GDPR Art. 6 basis, e.g. `public_task` or `contract`. |
+//! | `PERSON_ART9_CONDITION` | `undeclared` | GDPR Art. 9(2) condition for special-category data, e.g. `health_or_social_care`. |
+//! | `PERSON_TRANSFER_SAFEGUARD` | `undeclared` | Ch. V safeguard, e.g. `adequacy_regulations`. |
+//!
+//! The declarations **declare and record**; they do not enforce. A
+//! residency declaration makes a cross-border export visible in the audit
+//! trail and at `GET /api/compliance`; it does not block one, which is a
+//! deployment-network decision.
 
-/// Tamper-evident audit history: the SHA-256 hash chain over `audit_log`.
 /// How long an audit row keeps the address of the caller.
 pub mod address_retention;
+/// Tamper-evident audit history: the SHA-256 hash chain over `audit_log`.
 pub mod audit_chain;
 /// Read/disclosure auditing: purpose-of-use capture and access records.
 /// External witness: signed chain checkpoints kept off-box, so wholesale
@@ -77,6 +83,69 @@ pub fn audit_reads() -> bool {
             "1" | "true" | "yes" | "on"
         )
     })
+}
+
+/// The value every unset data-protection declaration reports. Chosen over
+/// an optimistic default so an operator reading `GET /api/compliance`
+/// cannot mistake "nobody configured this" for "this is compliant".
+pub const UNDECLARED: &str = "undeclared";
+
+/// The declared data-protection posture (GDPR Ch. V / Art. 6 / Art. 9).
+#[derive(Debug, Clone, serde::Serialize, PartialEq, Eq)]
+pub struct DataProtection {
+    /// The region data is confined to, or [`UNDECLARED`].
+    pub residency: String,
+    /// GDPR Art. 6 lawful basis, or [`UNDECLARED`].
+    pub lawful_basis: String,
+    /// GDPR Art. 9(2) condition for special-category data, or [`UNDECLARED`].
+    pub art9_condition: String,
+    /// GDPR Ch. V transfer safeguard, or [`UNDECLARED`].
+    pub transfer_safeguard: String,
+}
+
+impl DataProtection {
+    /// Read the declaration through `lookup` (an environment reader in
+    /// production, a map in tests). Unset or blank ⇒ [`UNDECLARED`].
+    #[must_use]
+    pub fn from_lookup(lookup: impl Fn(&str) -> Option<String>) -> Self {
+        let declared = |name: &str| {
+            lookup(name)
+                .map(|v| v.trim().to_string())
+                .filter(|v| !v.is_empty())
+                .unwrap_or_else(|| UNDECLARED.to_string())
+        };
+        Self {
+            residency: declared("PERSON_DATA_RESIDENCY"),
+            lawful_basis: declared("PERSON_LAWFUL_BASIS"),
+            art9_condition: declared("PERSON_ART9_CONDITION"),
+            transfer_safeguard: declared("PERSON_TRANSFER_SAFEGUARD"),
+        }
+    }
+
+    /// The process-wide declaration, read once and cached.
+    #[must_use]
+    pub fn get() -> &'static Self {
+        static DP: OnceLock<DataProtection> = OnceLock::new();
+        DP.get_or_init(|| Self::from_lookup(|name| std::env::var(name).ok()))
+    }
+
+    /// Whether sending data to `destination` leaves the declared residency
+    /// region — a GDPR Ch. V transfer that must be recorded.
+    ///
+    /// Conservative by construction: with residency undeclared, or a
+    /// destination the caller did not name, the answer is `false`, because
+    /// asserting a transfer we cannot substantiate would poison the audit
+    /// trail with noise. Comparison is case-insensitive and matches on the
+    /// region prefix, so `uk-south` is inside `uk`.
+    #[must_use]
+    pub fn is_cross_border(&self, destination: Option<&str>) -> bool {
+        let (Some(dest), true) = (destination, self.residency != UNDECLARED) else {
+            return false;
+        };
+        let dest = dest.trim().to_ascii_lowercase();
+        let home = self.residency.trim().to_ascii_lowercase();
+        !(dest == home || dest.starts_with(&format!("{home}-")))
+    }
 }
 
 /// Build provenance — the "reconstructible release" evidence (IEC 62304
@@ -129,7 +198,60 @@ impl Build {
 
 #[cfg(test)]
 mod tests {
-    use super::Build;
+    use super::{Build, DataProtection, UNDECLARED};
+
+    fn declared(pairs: &[(&str, &str)]) -> DataProtection {
+        DataProtection::from_lookup(|name| {
+            pairs
+                .iter()
+                .find(|(k, _)| *k == name)
+                .map(|(_, v)| (*v).to_string())
+        })
+    }
+
+    /// Nothing set reads as `undeclared`, never as a flattering default.
+    #[test]
+    fn unset_declarations_are_undeclared() {
+        let dp = declared(&[("PERSON_DATA_RESIDENCY", "   ")]);
+        assert_eq!(dp.residency, UNDECLARED);
+        assert_eq!(dp.lawful_basis, UNDECLARED);
+        assert_eq!(dp.art9_condition, UNDECLARED);
+        assert_eq!(dp.transfer_safeguard, UNDECLARED);
+    }
+
+    #[test]
+    fn declarations_are_read_and_trimmed() {
+        let dp = declared(&[
+            ("PERSON_DATA_RESIDENCY", " uk "),
+            ("PERSON_LAWFUL_BASIS", "contract"),
+            ("PERSON_ART9_CONDITION", "employment"),
+            ("PERSON_TRANSFER_SAFEGUARD", "adequacy_regulations"),
+        ]);
+        assert_eq!(dp.residency, "uk");
+        assert_eq!(dp.lawful_basis, "contract");
+        assert_eq!(dp.art9_condition, "employment");
+        assert_eq!(dp.transfer_safeguard, "adequacy_regulations");
+    }
+
+    /// Cross-border detection is conservative: undeclared residency or an
+    /// unnamed destination never manufactures a transfer event.
+    #[test]
+    fn cross_border_is_conservative() {
+        let undeclared = declared(&[]);
+        assert!(!undeclared.is_cross_border(Some("us-east-1")));
+        let uk = declared(&[("PERSON_DATA_RESIDENCY", "uk")]);
+        assert!(!uk.is_cross_border(None));
+        assert!(!uk.is_cross_border(Some("uk")));
+        assert!(
+            !uk.is_cross_border(Some(" UK-South ")),
+            "a sub-region is inside"
+        );
+        assert!(uk.is_cross_border(Some("eu-west-2")));
+        assert!(
+            uk.is_cross_border(Some("ukraine")),
+            "a prefix match must stop at a region boundary"
+        );
+    }
 
     /// A debug test build must never claim reproducible-release evidence.
     /// The point of the flag is to distinguish a traceable artefact from

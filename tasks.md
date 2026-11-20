@@ -8927,11 +8927,13 @@ Kept as they were by worker's SQ-1, then fixed (crate spec §13).
   key held outside the database, so a dump or SQL access does not read
   them and destroying the key is a cryptographic erasure. Decide first
   how matching and search treat an encrypted field. NWS-A5, NWS-A9.
-- [ ] **NW-6 (S)** worker and person: adopt care-pathway's residency
+- [x] **NW-6 (S)** worker and person: adopt care-pathway's residency
   declaration (`<P>_DATA_RESIDENCY`, `GET /api/compliance`, a
   transfer audit event on export). Also correct the stale "not yet
   adopted" list in each `src/compliance/mod.rs`, which still names
   erasure and record integrity, both of which have landed. NWS-H1.
+  **Done 2026-11-20** (each crate's spec §13 NW-6). Organization,
+  authentication-service and link-graph still declare no region.
 - [ ] **NW-7 (M)** SIEM export of the audit trail: push audit rows
   (worker, person, authentication `auth_events`) to a customer
   endpoint, at least once, carrying each row's chain hash so the SIEM
