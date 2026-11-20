@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — tests for edge branches
+
+- A degenerate id on the second side is skipped, every name algorithm,
+  a missing phonetic score for a name-less thing, a legacy `MatchResult`
+  without `confidence`, and the empty Soundex code of a non-ASCII name.
+  Lines 99.50% → 99.71%.
+
 ### Added — the demo binary is tested
 
 - `tests/demo.rs` runs the demo and checks each example shows what its

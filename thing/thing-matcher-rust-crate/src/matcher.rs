@@ -1034,6 +1034,79 @@ mod tests {
         (a - b).abs() < f64::EPSILON
     }
 
+    // ---------- edge branches ----------
+
+    /// A degenerate id on the second side is skipped, so a real shared id
+    /// further along still matches (SEC-M2).
+    #[test]
+    fn degenerate_id_on_the_other_side_is_skipped() {
+        let id = |v: &str| Identifier {
+            property_id: "isbn".into(),
+            value: v.into(),
+        };
+        let engine = MatchingEngine::default_config();
+        let a = Thing::builder().add_identifier(id("9780141439518")).build();
+        let b = Thing::builder()
+            .identifiers(vec![id("  "), id("9780141439518")])
+            .build();
+        assert!(engine.deterministic_match(&a, &b));
+        let c = Thing::builder().identifiers(vec![id("  ")]).build();
+        assert!(!engine.deterministic_match(&a, &c));
+    }
+
+    /// Every name algorithm agrees on identical names, and `Exact` gives no
+    /// partial credit.
+    #[test]
+    fn each_name_algorithm_scores_names() {
+        for algorithm in [
+            SimilarityAlgorithm::JaroWinkler,
+            SimilarityAlgorithm::Levenshtein,
+            SimilarityAlgorithm::Exact,
+            SimilarityAlgorithm::Combined,
+        ] {
+            let engine = MatchingEngine::new(MatchConfig {
+                name_algorithm: algorithm,
+                ..MatchConfig::default()
+            });
+            assert!(approx_eq(
+                engine.score_name_pair("Rosetta Stone", "rosetta stone"),
+                1.0
+            ));
+            let near = engine.score_name_pair("Rosetta Stone", "Rosetta Stones");
+            if matches!(algorithm, SimilarityAlgorithm::Exact) {
+                assert!(near.abs() < f64::EPSILON, "exact gives no partial credit");
+            } else {
+                assert!(near > 0.5 && near < 1.0, "{algorithm:?} scored {near}");
+            }
+        }
+    }
+
+    /// With phonetic matching on, a thing with no name has no phonetic
+    /// score rather than a zero one.
+    #[test]
+    fn phonetic_score_is_absent_without_names() {
+        let engine = MatchingEngine::new(MatchConfig {
+            use_phonetic_matching: true,
+            ..MatchConfig::default()
+        });
+        let named = Thing::builder().name("Rosetta Stone").build();
+        let unnamed = Thing::builder().build();
+        let r = engine.match_things(&named, &unnamed);
+        assert!(r.breakdown.name_phonetic_score.is_none());
+    }
+
+    /// A `MatchResult` serialised before `confidence` existed reads back as
+    /// `Low`, flagged for re-scoring rather than trusted.
+    #[test]
+    fn legacy_result_without_confidence_reads_as_low() {
+        let engine = MatchingEngine::default_config();
+        let t = Thing::builder().name("Rosetta Stone").build();
+        let mut json = serde_json::to_value(engine.match_things(&t, &t)).expect("serialises");
+        json.as_object_mut().expect("object").remove("confidence");
+        let back: MatchResult = serde_json::from_value(json).expect("deserialises");
+        assert_eq!(back.confidence, Confidence::Low);
+    }
+
     // ---------- MatchConfig presets ----------
 
     /// Pins the default preset: threshold `0.80` and strict mode off.

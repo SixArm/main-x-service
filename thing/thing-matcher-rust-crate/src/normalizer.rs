@@ -532,4 +532,11 @@ mod tests {
         assert!(Normalizer::phonetic_code("").is_empty());
         assert!(Normalizer::phonetic_code("   ").is_empty());
     }
+
+    /// A name with no ASCII letters left after normalisation has no
+    /// Soundex code, rather than a code of padding.
+    #[test]
+    fn phonetic_code_of_a_non_ascii_name_is_empty() {
+        assert_eq!(Normalizer::phonetic_code("東京"), "");
+    }
 }
