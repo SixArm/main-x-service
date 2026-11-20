@@ -96,8 +96,11 @@ podman build -f organization/organization-service-with-axum/Dockerfile \
   -t mxi-family-organization-service .
 podman build -f care-pathway/care-pathway-service-with-axum/Dockerfile \
   -t mxi-family-care-pathway-service .
-podman build -f project-portfolio-management/project-portfolio-management-service-with-loco/Dockerfile \
-  -t mxi-family-portfolio-service .
+# portfolio-service lives in its own repository now; build it from a
+# checkout of https://github.com/project-portfolio-management/project-portfolio-management
+# (its project-portfolio-management-service-with-rust/Dockerfile):
+#   podman build -f project-portfolio-management-service-with-rust/Dockerfile \
+#     -t mxi-family-portfolio-service .
 podman build -f authentication/authentication-service-with-axum/Dockerfile \
   -t mxi-family-authentication-service .
 podman build -f link/link-graph-service-with-axum/Dockerfile \

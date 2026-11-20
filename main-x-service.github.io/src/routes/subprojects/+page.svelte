@@ -14,7 +14,7 @@
         { name: "organization-service", path: "organization/organization-service-with-axum", note: "Organization (schema.org/Organization)" },
         { name: "care-pathway-service", path: "care-pathway/care-pathway-service-with-axum", note: "Care pathway (clinical pathway)" },
         { name: "case-service", path: "case/case-service-with-axum", note: "Case (governmental case tracking)" },
-        { name: "project-portfolio-management-service", path: "project-portfolio-management/project-portfolio-management-service-with-loco", note: "Plan (one recursive tree; kind is a label, not a gate)" },
+        { name: "project-portfolio-management-service", path: "https://github.com/project-portfolio-management/project-portfolio-management/tree/main/project-portfolio-management-service-with-rust", note: "Plan (one recursive tree; kind is a label, not a gate)" },
     ];
 
     const matchers: Row[] = [
@@ -94,7 +94,7 @@
         <tbody>
             {#each section.rows as row}
                 <tr>
-                    <td><a href={`${REPO}/${row.path}`}>{row.name}</a></td>
+                    <td><a href={row.path.startsWith("https://") ? row.path : `${REPO}/${row.path}`}>{row.name}</a></td>
                     <td>{row.note}</td>
                 </tr>
             {/each}
