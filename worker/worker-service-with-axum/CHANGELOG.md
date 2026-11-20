@@ -8,6 +8,17 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ## [Unreleased]
 
+### Added — HTTP tests for reading, changing and deleting assessments
+
+- `tests/assessments_http.rs`: `GET`, `PUT` and `DELETE
+  /api/workers/{id}/assessments/{assessment_id}` and the assessment
+  profile had no HTTP test. Each is now driven against Postgres, and an
+  assessment named under another worker's id is a `404` for read, update
+  and delete alike, leaving it unchanged, so a caller allowed one worker
+  cannot reach another's results by id. Status moves follow the
+  transition rules (an illegal or unknown status is `422` and changes
+  nothing); a deleted assessment is gone from reads and the profile.
+
 ### Added — GDPR residency and lawful-basis declarations (NW-6)
 
 - `WORKER_DATA_RESIDENCY`, `WORKER_LAWFUL_BASIS`, `WORKER_ART9_CONDITION` and
