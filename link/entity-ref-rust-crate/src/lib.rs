@@ -409,6 +409,60 @@ impl fmt::Display for EdgeKind {
 mod tests {
     use super::*;
 
+    /// Every type names its owning service (cross-service-linking.md §3);
+    /// sub-resource types share their parent's service.
+    #[test]
+    fn every_type_maps_to_its_owning_service() {
+        let expected = [
+            (EntityType::Person, "person-service"),
+            (EntityType::Worker, "worker-service"),
+            (EntityType::Organization, "organization-service"),
+            (EntityType::Case, "case-service"),
+            (EntityType::Place, "place-service"),
+            (EntityType::Thing, "thing-service"),
+            (EntityType::Event, "event-service"),
+            (EntityType::Course, "course-service"),
+            (EntityType::CourseInstance, "course-service"),
+            (EntityType::CarePathway, "care-pathway-service"),
+            (EntityType::CarePathwayInstance, "care-pathway-service"),
+            (EntityType::PatientFlowStay, "patient-flow-service"),
+        ];
+        assert_eq!(expected.len(), EntityType::ALL.len());
+        for (t, service) in expected {
+            assert_eq!(t.service(), service, "{t}");
+            assert_eq!(EntityRef::new(t, Uuid::nil()).service(), service);
+        }
+    }
+
+    /// `Display` is the wire token, so a ref formats as `type:uuid`.
+    #[test]
+    fn display_is_the_wire_token() {
+        for t in EntityType::ALL {
+            assert_eq!(t.to_string(), t.as_str());
+        }
+        for k in EdgeKind::ALL {
+            assert_eq!(k.to_string(), k.as_str());
+        }
+    }
+
+    /// The inverse labels of the §9 registry, one per kind.
+    #[test]
+    fn inverse_labels_match_the_registry() {
+        let expected = [
+            (EdgeKind::SameIdentity, None),
+            (EdgeKind::WorksAt, Some("has_member")),
+            (EdgeKind::MemberOf, Some("has_member")),
+            (EdgeKind::EmployedBy, Some("employs")),
+            (EdgeKind::SubjectOf, Some("is_subject_of")),
+            (EdgeKind::ContinuesAs, Some("continued_from")),
+        ];
+        assert_eq!(expected.len(), EdgeKind::ALL.len());
+        for (k, inverse) in expected {
+            assert_eq!(k.inverse(), inverse, "{k}");
+            assert_eq!(k.inverse().is_none(), k.is_symmetric(), "{k}");
+        }
+    }
+
     fn a_uuid() -> Uuid {
         Uuid::parse_str("0c4f1e2a-0000-4000-8000-000000000000").unwrap()
     }

@@ -932,6 +932,48 @@ mod tests {
         );
     }
 
+    /// Malformed retired entries are skipped, not fatal: one bad entry in
+    /// the list must not stop the good ones verifying their history.
+    #[test]
+    fn malformed_retired_entries_are_skipped() {
+        let old = "fedcba9876543210".repeat(4);
+        let new = "13579bdf02468ace".repeat(4);
+        let old_tag = KeySet::load(&config(), Some(&old), None)
+            .tag(AUDIT, b"historic row")
+            .expect("enabled");
+        let rotated = KeySet::load_with_domains(
+            &config(),
+            Some(&new),
+            Some(&format!("no-colon, k2:not-hex, k3:abcd, ,k0:{old}")),
+            Some("k1"),
+            &[AUDIT],
+        );
+        let as_id = |id: &str| old_tag.replace("d1.k1:", &format!("d1.{id}:"));
+        assert_eq!(
+            rotated.verify(AUDIT, Some(&as_id("k0")), b"historic row"),
+            MacVerdict::Valid
+        );
+        for skipped in ["k2", "k3", "no-colon"] {
+            assert_eq!(
+                rotated.verify(AUDIT, Some(&as_id(skipped)), b"historic row"),
+                MacVerdict::UnknownKey(skipped.to_string()),
+                "{skipped} must not have been loaded"
+            );
+        }
+    }
+
+    /// The write prefix names the scheme and the active key, and there is
+    /// none when MACs are off.
+    #[test]
+    fn active_prefix_names_scheme_and_key() {
+        let key = "13579bdf02468ace".repeat(4);
+        let on = KeySet::load_with_domains(&config(), Some(&key), None, Some("k1"), &[AUDIT]);
+        assert_eq!(on.active_prefix().as_deref(), Some("d1.k1:"));
+        let tag = on.tag(AUDIT, b"row").expect("enabled");
+        assert!(tag.starts_with(&on.active_prefix().expect("enabled")));
+        assert_eq!(KeySet::load(&config(), None, None).active_prefix(), None);
+    }
+
     /// An unusable key disables writing rather than being used.
     #[test]
     fn unusable_keys_disable_macs_rather_than_weakening_them() {
