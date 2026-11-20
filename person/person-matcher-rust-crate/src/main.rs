@@ -151,7 +151,7 @@ fn demo_address(engine: &MatchingEngine) {
 
 /// Example 5: two clearly distinct records that fall below threshold.
 fn demo_no_match(engine: &MatchingEngine) {
-    println!("Example 5: Different Patients (No Match)");
+    println!("Example 5: Different People (No Match)");
     let patient9 = Person::builder()
         .given_name("Alice")
         .family_name("Anderson")

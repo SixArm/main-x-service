@@ -10,6 +10,13 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — the demo binary is tested
+
+- `tests/demo.rs` runs the demo and checks each example shows what its
+  heading claims, so a library change cannot silently break or empty an
+  example. The bin target is `test = false`: it has no unit tests, and its
+  empty test harness was being counted as uncovered.
+
 ### Added — correlated groups, value frequencies and evidence terms
 
 - Correlated components (`agents/share/match-evidence.md` §6):

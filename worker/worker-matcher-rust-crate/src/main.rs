@@ -141,7 +141,7 @@ fn demo_address_match(engine: &MatchingEngine) {
 
 /// Example 5: two clearly different people do not match.
 fn demo_no_match(engine: &MatchingEngine) {
-    println!("Example 5: Different Patients (No Match)");
+    println!("Example 5: Different Workers (No Match)");
     let patient9 = Worker::builder()
         .given_name("Alice")
         .family_name("Anderson")

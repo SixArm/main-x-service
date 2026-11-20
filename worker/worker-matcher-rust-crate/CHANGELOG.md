@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — the demo binary is tested
+
+- `tests/demo.rs` runs the demo and checks each example shows what its
+  heading claims, so a library change cannot silently break or empty an
+  example. The bin target is `test = false`: it has no unit tests, and its
+  empty test harness was being counted as uncovered.
+- Example 5 said "Different Patients"; it now says "Different Workers".
+
 ### Fixed — gender `Unknown` is missing data
 
 - `Gender::Unknown` ("no gender recorded") scored as a value: two

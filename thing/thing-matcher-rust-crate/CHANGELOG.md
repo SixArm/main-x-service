@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — the demo binary is tested
+
+- `tests/demo.rs` runs the demo and checks each example shows what its
+  heading claims, so a library change cannot silently break or empty an
+  example. The bin target is `test = false`: it has no unit tests, and its
+  empty test harness was being counted as uncovered.
+- The "Strict vs Lenient" example printed `Strict: 1.00 (match: false)`
+  with no explanation. It now says strict mode also requires a
+  deterministic match, which is why a near-perfect score is still a no.
+
 ### Added — correlated groups, value frequencies, per-term evidence (2026-11-09)
 
 Per `agents/share/match-evidence.md` §6–§8 and spec §5.12.1–§5.12.4.

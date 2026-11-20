@@ -12,6 +12,12 @@ keywords = ["person", "matching", "healthcare", "identity", "fhir"]
 categories = ["science", "data-structures", "value-formatting"]
 include = ["src/**/*", "LICENSE.md", "README.md", "CHANGELOG.md"]
 
+[[bin]]
+name = "person-matcher"
+path = "src/main.rs"
+# No unit tests live here; tests/demo.rs runs the binary instead.
+test = false
+
 [dependencies]
 chrono = { version = "0.4", features = ["serde"] }
 serde = { version = "1.0", features = ["derive"] }

@@ -126,6 +126,11 @@ fn main() {
         .build();
     let rs = strict.match_events(&e1, &e2);
     let rl = lenient.match_events(&e1, &e2);
-    println!("Strict:  {:.2} (match: {})", rs.score, rs.is_match);
+    // Strict mode needs a deterministic match as well as the threshold,
+    // so a near-perfect score with no shared identifier is still a no.
+    println!(
+        "Strict:  {:.2} (match: {}; strict mode also requires a deterministic match)",
+        rs.score, rs.is_match
+    );
     println!("Lenient: {:.2} (match: {})", rl.score, rl.is_match);
 }

@@ -17,6 +17,8 @@ path = "src/lib.rs"
 [[bin]]
 name = "case-matcher"
 path = "src/main.rs"
+# No unit tests live here; tests/demo.rs runs the binary instead.
+test = false
 
 [dependencies]
 serde = { version = "1.0", features = ["derive"] }

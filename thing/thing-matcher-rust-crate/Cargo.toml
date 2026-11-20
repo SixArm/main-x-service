@@ -12,6 +12,12 @@ keywords = ["schema-org", "thing", "matching", "deduplication", "record-linkage"
 categories = ["data-structures", "science"]
 include = ["src/**/*", "LICENSE.md", "README.md", "CHANGELOG.md"]
 
+[[bin]]
+name = "thing-matcher"
+path = "src/main.rs"
+# No unit tests live here; tests/demo.rs runs the binary instead.
+test = false
+
 [dependencies]
 serde = { version = "1.0", features = ["derive"] }
 serde_json = { version = "1.0", features = ["float_roundtrip", "arbitrary_precision"] }
