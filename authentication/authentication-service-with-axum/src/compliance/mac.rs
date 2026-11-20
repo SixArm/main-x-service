@@ -102,10 +102,16 @@ impl Domain {
 /// loaded.
 fn keys() -> &'static KeySet {
     static KEYS: OnceLock<KeySet> = OnceLock::new();
-    KEYS.get_or_init(|| {
+    KEYS.get_or_init(|| load(|name| std::env::var(name).ok()))
+}
+
+/// Build the key set from `lookup`, logging any problem with the key.
+/// Separate from [`keys`] so tests can load one without the environment.
+fn load(lookup: impl Fn(&str) -> Option<String>) -> KeySet {
+    {
         let source = integrity_mac::resolve_root_key(
-            std::env::var(KEY_ENV).ok().as_deref(),
-            std::env::var(KEY_FILE_ENV).ok().as_deref(),
+            lookup(KEY_ENV).as_deref(),
+            lookup(KEY_FILE_ENV).as_deref(),
         );
         if let Some(warning) = &source.warning {
             tracing::warn!("{warning}");
@@ -130,11 +136,11 @@ fn keys() -> &'static KeySet {
         KeySet::load_with_domains(
             &CONFIG,
             source.key.as_deref(),
-            std::env::var(RETIRED_KEYS_ENV).ok().as_deref(),
-            std::env::var(KEY_ID_ENV).ok().as_deref(),
+            lookup(RETIRED_KEYS_ENV).as_deref(),
+            lookup(KEY_ID_ENV).as_deref(),
             &Domain::ALL,
         )
-    })
+    }
 }
 
 /// Whether a key is configured, so MACs are being written.
@@ -172,7 +178,82 @@ pub fn verify(domain: Domain, stored: Option<&str>, preimage: &[u8]) -> MacVerdi
 
 #[cfg(test)]
 mod tests {
-    use super::Domain;
+    use super::{CONFIG, Domain, KEY_ENV, KEY_FILE_ENV, KEY_ID_ENV, MacVerdict, load};
+    use integrity_mac::{KeyConfig, KeySet};
+
+    const ROOT: &str = "13579bdf02468ace13579bdf02468ace13579bdf02468ace13579bdf02468ace";
+
+    fn lookup(pairs: &[(&str, &str)]) -> impl Fn(&str) -> Option<String> {
+        let pairs: Vec<(String, String)> = pairs
+            .iter()
+            .map(|(k, v)| ((*k).to_string(), (*v).to_string()))
+            .collect();
+        move |name| {
+            pairs
+                .iter()
+                .find(|(k, _)| k == name)
+                .map(|(_, v)| v.clone())
+        }
+    }
+
+    /// With a key, an `auth_events` row is tagged and verifies, and an edit
+    /// to the row is detected.
+    #[test]
+    fn a_configured_key_tags_and_verifies_audit_rows() {
+        let keys = load(lookup(&[(KEY_ENV, ROOT), (KEY_ID_ENV, "k1")]));
+        assert!(keys.is_enabled());
+        let tag = keys.tag(Domain::AuditRow.as_str(), b"row").expect("tagged");
+        assert!(tag.starts_with(&keys.active_prefix().unwrap()));
+        assert_eq!(
+            keys.verify(Domain::AuditRow.as_str(), Some(&tag), b"row"),
+            MacVerdict::Valid
+        );
+        assert_eq!(
+            keys.verify(Domain::AuditRow.as_str(), Some(&tag), b"edited row"),
+            MacVerdict::Invalid
+        );
+    }
+
+    /// The module's claim: the service name is bound into the subkey, so a
+    /// sibling service sharing the same root key cannot produce a tag this
+    /// service accepts.
+    #[test]
+    fn a_sibling_services_tag_does_not_verify_here() {
+        let here = load(lookup(&[(KEY_ENV, ROOT), (KEY_ID_ENV, "k1")]));
+        let sibling = KeySet::load_with_domains(
+            &KeyConfig::new("person-service", "PERSON"),
+            Some(ROOT),
+            None,
+            Some("k1"),
+            &[Domain::AuditRow.as_str()],
+        );
+        let foreign = sibling
+            .tag(Domain::AuditRow.as_str(), b"row")
+            .expect("tagged");
+        assert_ne!(CONFIG.service, "person-service");
+        assert_eq!(
+            here.verify(Domain::AuditRow.as_str(), Some(&foreign), b"row"),
+            MacVerdict::Invalid
+        );
+    }
+
+    /// No key, a placeholder, a short key and an unreadable key file each
+    /// leave MACs off rather than written under a weak key.
+    #[test]
+    fn missing_or_unusable_keys_disable_macs() {
+        for (why, pairs) in [
+            ("none", vec![]),
+            ("placeholder", vec![(KEY_ENV, "00".repeat(32))]),
+            ("too short", vec![(KEY_ENV, "abcd".to_string())]),
+            (
+                "missing file",
+                vec![(KEY_FILE_ENV, "/nonexistent/mac.key".to_string())],
+            ),
+        ] {
+            let pairs: Vec<(&str, &str)> = pairs.iter().map(|(k, v)| (*k, v.as_str())).collect();
+            assert!(!load(lookup(&pairs)).is_enabled(), "{why}");
+        }
+    }
 
     /// Every domain has a distinct label, since the label *is* the
     /// separation — two domains sharing one would silently share a key.

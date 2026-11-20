@@ -139,3 +139,72 @@ async fn account_audit_returns_only_the_callers_events() {
     })
     .await;
 }
+
+/// The address-retention sweep removes a client address once it is older
+/// than the retention period, from audit rows and sessions alike, and
+/// leaves a fresh one alone. The rows themselves stay.
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL; run with: cargo test -- --ignored"]
+async fn the_address_sweep_removes_only_old_addresses() {
+    use authentication_service::{compliance::address_retention, models::sessions};
+
+    request::<App, _, _>(|_request, ctx| async move {
+        let user = users::Model::create_passwordless(&ctx.db, "sweep@example.com", "sweep")
+            .await
+            .unwrap();
+        AuthEvent::record_best_effort(
+            &ctx.db,
+            "signup",
+            Some("sweep@example.com"),
+            Some(user.pid),
+            Some("ok"),
+            Some("203.0.113.9"),
+        )
+        .await;
+        sessions::Model::issue(
+            &ctx.db,
+            "sweep-session",
+            user.pid,
+            None,
+            Some("203.0.113.9".into()),
+            serde_json::json!({}),
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(
+            address_retention::scrub(&ctx.db, 7).await.unwrap(),
+            0,
+            "fresh addresses stay"
+        );
+
+        sqlx::query("UPDATE auth_events SET created_at = created_at - interval '30 days'")
+            .execute(&ctx.db)
+            .await
+            .unwrap();
+        sqlx::query("UPDATE sessions SET created_at = created_at - interval '30 days'")
+            .execute(&ctx.db)
+            .await
+            .unwrap();
+        assert_eq!(
+            address_retention::scrub(&ctx.db, 7).await.unwrap(),
+            2,
+            "one row in each table"
+        );
+        let remaining: i64 = sqlx::query_scalar(
+            "SELECT (SELECT count(*) FROM auth_events WHERE source_ip IS NOT NULL)
+                  + (SELECT count(*) FROM sessions WHERE source_ip IS NOT NULL)",
+        )
+        .fetch_one(&ctx.db)
+        .await
+        .unwrap();
+        assert_eq!(remaining, 0);
+        let rows: i64 = sqlx::query_scalar("SELECT count(*) FROM auth_events")
+            .fetch_one(&ctx.db)
+            .await
+            .unwrap();
+        assert!(rows >= 1, "the audit row itself survives");
+    })
+    .await;
+}

@@ -10,6 +10,17 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — tests for the audit MAC key and the address sweep
+
+- The audit-row MAC key set is built through a lookup, so the configured
+  paths are tested: a key tags and verifies a row and detects an edit; a
+  sibling service sharing the root key cannot produce a tag this service
+  accepts (the subkey binds the service name); no key, a placeholder, a
+  short key and an unreadable key file each leave MACs off.
+- A DB test of the address-retention sweep: a fresh client address stays,
+  one older than the retention period is removed from both `auth_events`
+  and `sessions`, and the rows themselves survive.
+
 ### Fixed — a malformed signing seed stops boot
 
 - The SEC-A1 boot check accepted any set `TOKEN_PRIVATE_KEY_SEED` /
