@@ -10,6 +10,20 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — tests for the `user_attributes` task and handler edge branches
+
+- `tests/tasks/mod.rs` said the service registered no tasks; it has had
+  `user_attributes` for months. It now runs the task against Postgres: a
+  `set` persists, revokes the user's sessions (SEC-A8 — removing the
+  revoke fails the test) and is audited; `unset`, `clear` and the default
+  `show` change exactly what they should; a missing or doubled target, an
+  unknown user, an unknown op and a `set` without a key are refused
+  without writing.
+- `tests/requests/edges.rs`: both issuance endpoints answer `429` past the
+  per-email limit and audit the refusal; a too-short name falls back to
+  the email's local part, or `user`; `/me` refuses a token whose account
+  was erased; the Art. 15 audit export returns only the caller's events.
+
 ### Added — request tests for the session → PASETO exchange
 
 - `POST /api/auth/token` had no request test; only its CSRF decision was

@@ -9,6 +9,8 @@ mod admin;
 mod auth;
 #[cfg(feature = "paseto")]
 mod compliance;
+#[cfg(feature = "paseto")]
+mod edges;
 #[cfg(feature = "oidc")]
 mod oidc;
 #[cfg(feature = "paseto")]
