@@ -132,12 +132,13 @@ fn demo_no_match(engine: &MatchingEngine) {
 /// Example 7: Strict vs lenient thresholds on the same pair.
 fn demo_strict_vs_lenient() {
     println!("Example 7: Strict vs lenient thresholds");
-    let chem = Course::new("Organic Chemistry");
-    let chem_lab = Course::new("Organic Chemistry Lab");
+    // A pair scoring between the two thresholds, so the configs disagree.
+    let full = Course::new("Introduction to Computer Science");
+    let short = Course::new("Intro to Computer Science");
     let strict = MatchingEngine::new(MatchConfig::strict());
     let lenient = MatchingEngine::new(MatchConfig::lenient());
-    let strict_result = strict.match_courses(&chem, &chem_lab);
-    let lenient_result = lenient.match_courses(&chem, &chem_lab);
+    let strict_result = strict.match_courses(&full, &short);
+    let lenient_result = lenient.match_courses(&full, &short);
     println!(
         "Strict   Score: {:.2} (Match: {})",
         strict_result.score, strict_result.is_match

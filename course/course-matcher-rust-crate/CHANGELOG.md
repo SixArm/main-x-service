@@ -9,6 +9,19 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Fixed — tests that could not fail, and a demo that showed nothing
+
+- `strict_config_rejects_a_merely_probable_match` asserted only inside
+  `if score in [0.85, 0.95)`, and its pair scored 0.99, so it checked
+  nothing. It now uses a pair that scores 0.93 and asserts the range.
+- Demo Example 7 ("Strict vs lenient") used a pair both configs matched;
+  it now uses one they disagree on. `tests/demo.rs` runs the binary and
+  checks each example shows what its heading claims; the bin target is
+  `test = false`, having no unit tests of its own.
+- Removed an unreachable `union == 0` branch in `set_jaccard`; tests for
+  `MatchingEngine::config`, blank `same_as` entries not short-circuiting,
+  and `jaccard` of two empty sets. Line coverage 93.89% → 99.77%.
+
 ### Added — correlated groups, value frequencies, per-term evidence (T-17)
 
 Follows `agents/share/match-evidence.md` §6–§8. Correlated components

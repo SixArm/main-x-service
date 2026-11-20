@@ -501,17 +501,14 @@ fn set_jaccard(a: &[String], b: &[String]) -> Option<f64> {
     }
     // Sets are sorted+deduped, so `contains` counts each shared item once.
     let inter: usize = a_set.iter().filter(|x| b_set.contains(x)).count();
-    // |A ∪ B| = |A| + |B| − |A ∩ B|.
+    // |A ∪ B| = |A| + |B| − |A ∩ B|, which is at least |A| ≥ 1 here: both
+    // sets are non-empty past the guards above, so the division is safe.
     let union: usize = a_set.len() + b_set.len() - inter;
-    if union == 0 {
-        Some(0.0)
-    } else {
-        // Set sizes are small bounded counts; convert losslessly via u32
-        // (saturating at u32::MAX, which these counts never approach).
-        let inter_f64 = f64::from(u32::try_from(inter).unwrap_or(u32::MAX));
-        let union_f64 = f64::from(u32::try_from(union).unwrap_or(u32::MAX));
-        Some(inter_f64 / union_f64)
-    }
+    // Set sizes are small bounded counts; convert losslessly via u32
+    // (saturating at u32::MAX, which these counts never approach).
+    let inter_f64 = f64::from(u32::try_from(inter).unwrap_or(u32::MAX));
+    let union_f64 = f64::from(u32::try_from(union).unwrap_or(u32::MAX));
+    Some(inter_f64 / union_f64)
 }
 
 /// Score a pair of relationship-reference lists for the probabilistic
@@ -1313,14 +1310,56 @@ mod tests {
         let lenient = MatchingEngine::new(MatchConfig::default());
         let strict = MatchingEngine::new(MatchConfig::strict());
         let a = Course::new("Introduction to Computer Science");
-        let b = Course::new("Introduction to Computer Sciences");
+        let b = Course::new("Intro to Computer Science");
         let rl = lenient.match_courses(&a, &b);
         let rs = strict.match_courses(&a, &b);
-        // Same score, different is_match because the threshold moved.
+        // Same score, different is_match because the threshold moved. The
+        // pair must actually sit between the two thresholds, or the test
+        // proves nothing (an earlier pair scored 0.99 and asserted none of
+        // this).
         assert!((rl.score - rs.score).abs() < 1e-9);
-        if rl.score >= 0.85 && rl.score < 0.95 {
-            assert!(rl.is_match);
-            assert!(!rs.is_match);
-        }
+        assert!(
+            (0.85..0.95).contains(&rl.score),
+            "pair must fall between the thresholds, scored {}",
+            rl.score
+        );
+        assert!(rl.is_match);
+        assert!(!rs.is_match);
+    }
+
+    #[test]
+    fn engine_exposes_the_config_it_was_built_with() {
+        let strict = MatchingEngine::new(MatchConfig::strict());
+        assert!((strict.config().threshold - MatchConfig::strict().threshold).abs() < f64::EPSILON);
+        assert!(
+            (MatchingEngine::default_config().config().threshold
+                - MatchConfig::default().threshold)
+                .abs()
+                < f64::EPSILON
+        );
+        assert!(strict.config().threshold > MatchingEngine::default_config().config().threshold);
+    }
+
+    /// Two blank `same_as` entries must not "overlap" into a deterministic
+    /// match (SEC-M2): blanks are skipped, so only a real URL can match.
+    #[test]
+    fn blank_same_as_entries_do_not_short_circuit() {
+        let mut a = Course::new("Organic Chemistry");
+        let mut b = Course::new("Medieval History");
+        a.same_as = vec!["   ".into()];
+        b.same_as = vec!["   ".into()];
+        assert!(!deterministic_match(&a, &b));
+        a.same_as.push("https://www.wikidata.org/wiki/Q1".into());
+        b.same_as.push("HTTPS://WWW.WIKIDATA.ORG/wiki/Q1".into());
+        assert!(
+            deterministic_match(&a, &b),
+            "a real shared URL still matches"
+        );
+    }
+
+    #[test]
+    fn jaccard_of_two_empty_sets_is_zero_not_nan() {
+        let empty: HashSet<&str> = HashSet::new();
+        assert!(jaccard(&empty, &empty).abs() < f64::EPSILON);
     }
 }
