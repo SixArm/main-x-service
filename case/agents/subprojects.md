@@ -30,7 +30,7 @@ cargo run                    # demo binary (not SemVer surface)
 
 # Service — needs PostgreSQL; port 5150
 cd case-service-with-axum
-export DB_URL=postgres://loco:loco@localhost:5432/case_service_development
+export DB_URL=postgres://postgres:postgres@localhost:5432/case_service_development
 # optional SSO env (PASETO verifier is env-injected):
 #   CASE_PASETO_KEYS=… CASE_JWT_ISSUER=… CASE_JWT_AUDIENCE=…
 # (auth pivot: RS256 JWT + JWKS decommissioned for offline PASETO

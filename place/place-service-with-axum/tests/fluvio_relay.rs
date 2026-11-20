@@ -12,7 +12,7 @@
 //!
 //! ```sh
 //! podman compose -f compose.fluvio.yaml up -d
-//! DB_URL=postgres://loco:loco@localhost:5432/place_service_test \
+//! DB_URL=postgres://postgres:postgres@localhost:5432/place_service_test \
 //!   PLACE_FLUVIO_ENDPOINT=127.0.0.1:9103 \
 //!   cargo test --features fluvio --test fluvio_relay -- --ignored
 //! podman compose -f compose.fluvio.yaml down -v

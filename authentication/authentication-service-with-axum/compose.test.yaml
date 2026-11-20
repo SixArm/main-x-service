@@ -9,7 +9,7 @@
 # directly if you would rather not use the script.
 #
 # The connection details deliberately match what CI provides
-# (.github/workflows/ci.yml `test-db`): superuser `loco`/`loco` on 5432.
+# (.github/workflows/ci.yml `test-db`): superuser `postgres`/`postgres` on 5432.
 # A database a test passes against locally but CI cannot reproduce is
 # worse than no local database.
 services:
@@ -19,8 +19,8 @@ services:
     image: docker.io/library/postgres:18-alpine
     container_name: mxi-authentication-test-db
     environment:
-      POSTGRES_USER: loco
-      POSTGRES_PASSWORD: loco
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
       # Matches config/test.yaml, so a bare `cargo test -- --ignored`
       # finds its database. `scripts/ci-check.sh test-db` ignores this and
       # creates its own `ci_*` database per crate instead.
@@ -44,7 +44,7 @@ services:
     healthcheck:
       # `scripts/test-db.sh up` waits on this, so a test run cannot start
       # against a database that is still initialising.
-      test: ["CMD-SHELL", "pg_isready -U loco -d authentication_service_test"]
+      test: ["CMD-SHELL", "pg_isready -U postgres -d authentication_service_test"]
       interval: 2s
       timeout: 3s
       retries: 30

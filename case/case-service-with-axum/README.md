@@ -48,7 +48,7 @@ opened date, subjects, keywords, identifiers, sameAs, languages).
 Requires PostgreSQL.
 
 ```bash
-export DB_URL=postgres://loco:loco@localhost:5432/case_service_development
+export DB_URL=postgres://postgres:postgres@localhost:5432/case_service_development
 export SQLX_OFFLINE=true  # the query! macros read .sqlx/, not the database
 cargo run -- start        # migrations auto-run in development
 

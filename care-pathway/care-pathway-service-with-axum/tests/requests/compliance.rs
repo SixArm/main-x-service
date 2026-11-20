@@ -16,7 +16,7 @@
 //! database. Run with:
 //!
 //! ```sh
-//! DB_URL=postgres://loco:loco@localhost:5432/care_pathway_service_test \
+//! DB_URL=postgres://postgres:postgres@localhost:5432/care_pathway_service_test \
 //!   cargo test -- --ignored
 //! ```
 

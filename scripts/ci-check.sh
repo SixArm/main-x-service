@@ -73,8 +73,8 @@ CRATE="${2:-}"
 # truncating test harness in one cannot corrupt another's run.
 PG_HOST="${POSTGRES_HOST:-localhost}"
 PG_PORT="${POSTGRES_PORT:-5432}"
-PG_USER="${POSTGRES_USER:-loco}"
-PG_PASSWORD="${POSTGRES_PASSWORD:-loco}"
+PG_USER="${POSTGRES_USER:-postgres}"
+PG_PASSWORD="${POSTGRES_PASSWORD:-postgres}"
 
 # sqlx checks `query!` against the committed `.sqlx/` data, never a live
 # database, so every stage builds the same way with or without Postgres.

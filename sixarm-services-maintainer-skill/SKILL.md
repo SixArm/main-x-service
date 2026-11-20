@@ -141,7 +141,7 @@ before being added).
 ### Local Postgres for `test-db`
 
 Every service crate carries its own `compose.test.yaml` (Podman, not
-Docker — `postgres:18-alpine`, superuser `loco`/`loco`, PGDATA on
+Docker — `postgres:18-alpine`, superuser `postgres`/`postgres`, PGDATA on
 tmpfs so every start is a clean `initdb`):
 
 ```sh

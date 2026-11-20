@@ -22,7 +22,7 @@ PostgresSQL version 18
 Every service crate carries a **`compose.test.yaml`**: one
 `postgres:18-alpine` container providing exactly what that crate's
 DB-gated suite needs, and matching what CI provides
-(`.github/workflows/ci.yml` `test-db`) — superuser `loco`/`loco`, port
+(`.github/workflows/ci.yml` `test-db`) — superuser `postgres`/`postgres`, port
 5432, the database its `config/test.yaml` names. Podman, not Docker
 (see [rust-axum-stack.md](rust-axum-stack.md)).
 

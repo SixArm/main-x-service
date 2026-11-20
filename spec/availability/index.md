@@ -154,7 +154,7 @@ the builder stage and are discarded.
 ### Compose for dev / test / prod
 
 **Test (every service crate, uniform).** `compose.test.yaml` brings up
-one container — `postgres:18-alpine`, superuser `loco`/`loco` on port
+one container — `postgres:18-alpine`, superuser `postgres`/`postgres` on port
 5432, the database that crate's `config/test.yaml` names, the shared
 extension init from `ci/postgres-init/`, and PGDATA on **tmpfs** so each
 `up` starts from a clean initdb. It is deliberately the same shape CI

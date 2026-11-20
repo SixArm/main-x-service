@@ -3,7 +3,7 @@
 # Start / stop a service's throwaway Postgres for its DB-gated test suite.
 #
 # Every service crate carries a `compose.test.yaml` describing one
-# Postgres 18 container: superuser `loco`/`loco` on port 5432, the
+# Postgres 18 container: superuser `postgres`/`postgres` on port 5432, the
 # database its `config/test.yaml` expects, the shared extension init from
 # ci/postgres-init, and its data directory on tmpfs. Those settings match
 # what CI provides (.github/workflows/ci.yml `test-db`), so a suite that
@@ -95,7 +95,7 @@ case "${CMD}" in
     # otherwise invisible — you get a real server answering with
     # "database does not exist", which reads like a broken container.
     if command -v psql >/dev/null 2>&1; then
-      if ! PGPASSWORD=loco psql -h localhost -p "${PORT}" -U loco -d "${DB}" \
+      if ! PGPASSWORD=postgres psql -h localhost -p "${PORT}" -U postgres -d "${DB}" \
              -tAc 'select 1' >/dev/null 2>&1; then
         echo "test-db: ${NAME} is healthy, but localhost:${PORT} does not reach it." >&2
         echo "         Something else is probably listening there. Check with:" >&2
@@ -106,7 +106,7 @@ case "${CMD}" in
       fi
     fi
     echo "test-db: ${NAME} ready"
-    echo "  DB_URL=postgres://loco:loco@localhost:${PORT}/${DB}"
+    echo "  DB_URL=postgres://postgres:postgres@localhost:${PORT}/${DB}"
     echo "  next: scripts/ci-check.sh test-db ${2%/}"
     ;;
 
@@ -120,7 +120,7 @@ case "${CMD}" in
   psql)
     FILE="$(compose_file "${2:-}")"
     exec podman exec -it "$(container_name "${FILE}")" \
-      psql -U loco -d "$(db_name "${FILE}")"
+      psql -U postgres -d "$(db_name "${FILE}")"
     ;;
 
   logs)
@@ -130,7 +130,7 @@ case "${CMD}" in
 
   url)
     FILE="$(compose_file "${2:-}")"
-    printf 'postgres://loco:loco@localhost:%s/%s\n' "${PORT}" "$(db_name "${FILE}")"
+    printf 'postgres://postgres:postgres@localhost:%s/%s\n' "${PORT}" "$(db_name "${FILE}")"
     ;;
 
   status)

@@ -14,7 +14,7 @@
 //! database-less machine:
 //!
 //! ```sh
-//! DB_URL=postgres://loco:loco@localhost:5432/place_service_test \
+//! DB_URL=postgres://postgres:postgres@localhost:5432/place_service_test \
 //!   cargo test --test audit_verify -- --ignored
 //! ```
 

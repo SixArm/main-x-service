@@ -179,7 +179,7 @@ scripts/test-db.sh down event/event-service-with-axum
 ```
 
 Tests run on the host, against a containerised database. The container
-mirrors what CI provides — Postgres 18, superuser `loco`/`loco`, port
+mirrors what CI provides — Postgres 18, superuser `postgres`/`postgres`, port
 5432 — so a suite that passes here passes there for the same reasons.
 
 ### Expected Test Output

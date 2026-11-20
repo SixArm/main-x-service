@@ -49,8 +49,8 @@ services:
     image: docker.io/library/postgres:18-alpine
     container_name: mxi-family-postgres
     environment:
-      POSTGRES_USER: loco
-      POSTGRES_PASSWORD: loco
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
       POSTGRES_DB: postgres
     volumes:
       # PGDATA lives under /var/lib/postgresql in the postgres:18 image
@@ -60,7 +60,7 @@ services:
       - ./init/00-extensions.sh:/docker-entrypoint-initdb.d/00-extensions.sh:ro
       - ./init/10-databases.sh:/docker-entrypoint-initdb.d/10-databases.sh:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U loco"]
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 2s
       timeout: 3s
       retries: 30
@@ -76,7 +76,7 @@ services:
     command: ["db", "migrate", "-e", "production"]
     environment:
       <<: *common-env
-      DB_URL: postgresql://loco:loco@postgres:5432/person
+      DB_URL: postgresql://postgres:postgres@postgres:5432/person
       # Plain traffic stays on this host's private network.
       DB_ALLOW_INSECURE: "true"
     depends_on:
@@ -97,7 +97,7 @@ services:
     restart: unless-stopped
     environment:
       <<: *common-env
-      DB_URL: postgresql://loco:loco@postgres:5432/person
+      DB_URL: postgresql://postgres:postgres@postgres:5432/person
       # Plain traffic stays on this host's private network.
       DB_ALLOW_INSECURE: "true"
     ports: ["8081:8080"]
@@ -120,7 +120,7 @@ services:
     command: ["db", "migrate", "-e", "production"]
     environment:
       <<: *common-env
-      DB_URL: postgresql://loco:loco@postgres:5432/worker
+      DB_URL: postgresql://postgres:postgres@postgres:5432/worker
       # Plain traffic stays on this host's private network.
       DB_ALLOW_INSECURE: "true"
     depends_on:
@@ -136,7 +136,7 @@ services:
     restart: unless-stopped
     environment:
       <<: *common-env
-      DB_URL: postgresql://loco:loco@postgres:5432/worker
+      DB_URL: postgresql://postgres:postgres@postgres:5432/worker
       # Plain traffic stays on this host's private network.
       DB_ALLOW_INSECURE: "true"
     ports: ["8082:8080"]
@@ -159,7 +159,7 @@ services:
     command: ["db", "migrate", "-e", "production"]
     environment:
       <<: *common-env
-      DB_URL: postgresql://loco:loco@postgres:5432/place
+      DB_URL: postgresql://postgres:postgres@postgres:5432/place
       # Plain traffic stays on this host's private network.
       DB_ALLOW_INSECURE: "true"
     depends_on:
@@ -175,7 +175,7 @@ services:
     restart: unless-stopped
     environment:
       <<: *common-env
-      DB_URL: postgresql://loco:loco@postgres:5432/place
+      DB_URL: postgresql://postgres:postgres@postgres:5432/place
       # Plain traffic stays on this host's private network.
       DB_ALLOW_INSECURE: "true"
     ports: ["8083:8080"]
@@ -198,7 +198,7 @@ services:
     command: ["db", "migrate", "-e", "production"]
     environment:
       <<: *common-env
-      DB_URL: postgresql://loco:loco@postgres:5432/thing
+      DB_URL: postgresql://postgres:postgres@postgres:5432/thing
       # Plain traffic stays on this host's private network.
       DB_ALLOW_INSECURE: "true"
     depends_on:
@@ -214,7 +214,7 @@ services:
     restart: unless-stopped
     environment:
       <<: *common-env
-      DB_URL: postgresql://loco:loco@postgres:5432/thing
+      DB_URL: postgresql://postgres:postgres@postgres:5432/thing
       # Plain traffic stays on this host's private network.
       DB_ALLOW_INSECURE: "true"
     ports: ["8084:8080"]
@@ -237,7 +237,7 @@ services:
     command: ["db", "migrate", "-e", "production"]
     environment:
       <<: *common-env
-      DB_URL: postgresql://loco:loco@postgres:5432/event
+      DB_URL: postgresql://postgres:postgres@postgres:5432/event
       # Plain traffic stays on this host's private network.
       DB_ALLOW_INSECURE: "true"
     depends_on:
@@ -253,7 +253,7 @@ services:
     restart: unless-stopped
     environment:
       <<: *common-env
-      DB_URL: postgresql://loco:loco@postgres:5432/event
+      DB_URL: postgresql://postgres:postgres@postgres:5432/event
       # Plain traffic stays on this host's private network.
       DB_ALLOW_INSECURE: "true"
     ports: ["8085:8080"]
@@ -276,7 +276,7 @@ services:
     command: ["db", "migrate", "-e", "production"]
     environment:
       <<: *common-env
-      DB_URL: postgresql://loco:loco@postgres:5432/course
+      DB_URL: postgresql://postgres:postgres@postgres:5432/course
       # Plain traffic stays on this host's private network.
       DB_ALLOW_INSECURE: "true"
     depends_on:
@@ -292,7 +292,7 @@ services:
     restart: unless-stopped
     environment:
       <<: *common-env
-      DB_URL: postgresql://loco:loco@postgres:5432/course
+      DB_URL: postgresql://postgres:postgres@postgres:5432/course
       # Plain traffic stays on this host's private network.
       DB_ALLOW_INSECURE: "true"
     ports: ["8086:8080"]
@@ -315,7 +315,7 @@ services:
     command: ["db", "migrate", "-e", "production"]
     environment:
       <<: *common-env
-      DB_URL: postgresql://loco:loco@postgres:5432/organization
+      DB_URL: postgresql://postgres:postgres@postgres:5432/organization
       # Plain traffic stays on this host's private network.
       DB_ALLOW_INSECURE: "true"
     depends_on:
@@ -331,7 +331,7 @@ services:
     restart: unless-stopped
     environment:
       <<: *common-env
-      DB_URL: postgresql://loco:loco@postgres:5432/organization
+      DB_URL: postgresql://postgres:postgres@postgres:5432/organization
       # Plain traffic stays on this host's private network.
       DB_ALLOW_INSECURE: "true"
     ports: ["8087:5150"]
@@ -354,7 +354,7 @@ services:
     command: ["db", "migrate", "-e", "production"]
     environment:
       <<: *common-env
-      DB_URL: postgresql://loco:loco@postgres:5432/care_pathway
+      DB_URL: postgresql://postgres:postgres@postgres:5432/care_pathway
       # Plain traffic stays on this host's private network.
       DB_ALLOW_INSECURE: "true"
     depends_on:
@@ -370,7 +370,7 @@ services:
     restart: unless-stopped
     environment:
       <<: *common-env
-      DB_URL: postgresql://loco:loco@postgres:5432/care_pathway
+      DB_URL: postgresql://postgres:postgres@postgres:5432/care_pathway
       # Plain traffic stays on this host's private network.
       DB_ALLOW_INSECURE: "true"
     ports: ["8088:5150"]
@@ -393,7 +393,7 @@ services:
     command: ["db", "migrate", "-e", "production"]
     environment:
       <<: *common-env
-      DB_URL: postgresql://loco:loco@postgres:5432/case
+      DB_URL: postgresql://postgres:postgres@postgres:5432/case
       # Plain traffic stays on this host's private network.
       DB_ALLOW_INSECURE: "true"
     depends_on:
@@ -409,7 +409,7 @@ services:
     restart: unless-stopped
     environment:
       <<: *common-env
-      DB_URL: postgresql://loco:loco@postgres:5432/case
+      DB_URL: postgresql://postgres:postgres@postgres:5432/case
       # Plain traffic stays on this host's private network.
       DB_ALLOW_INSECURE: "true"
     ports: ["8089:5150"]
@@ -432,7 +432,7 @@ services:
     command: ["db", "migrate", "-e", "production"]
     environment:
       <<: *common-env
-      DB_URL: postgresql://loco:loco@postgres:5432/authentication
+      DB_URL: postgresql://postgres:postgres@postgres:5432/authentication
       # Plain traffic stays on this host's private network.
       DB_ALLOW_INSECURE: "true"
       # SEC-A1 fail-closed: APP_ENV=production (baked into the image)
@@ -456,7 +456,7 @@ services:
     restart: unless-stopped
     environment:
       <<: *common-env
-      DB_URL: postgresql://loco:loco@postgres:5432/authentication
+      DB_URL: postgresql://postgres:postgres@postgres:5432/authentication
       # Plain traffic stays on this host's private network.
       DB_ALLOW_INSECURE: "true"
       TOKEN_PRIVATE_KEY_SEED: ${TOKEN_PRIVATE_KEY_SEED:-dv-Nv3h-Q3THpU3sgs5VvzwuWe4MbHy7uEjNjNLGEws}
@@ -485,7 +485,7 @@ services:
     command: ["/app/link-graph-service", "start", "--all"]
     restart: unless-stopped
     environment:
-      DB_URL: postgresql://loco:loco@postgres:5432/link_graph
+      DB_URL: postgresql://postgres:postgres@postgres:5432/link_graph
       DB_AUTO_MIGRATE: "true"
       # Plain traffic stays on this host's private network.
       DB_ALLOW_INSECURE: "true"

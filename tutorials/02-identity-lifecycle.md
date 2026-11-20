@@ -45,7 +45,7 @@ Postgres directly, which is faster to iterate on and just as real).
 
 The family ships a per-crate throwaway test Postgres
 ([`postgresql.md`](../agents/share/postgresql.md)): one `postgres:18-alpine`
-container, superuser `loco`/`loco`, on tmpfs so every start is a clean
+container, superuser `postgres`/`postgres`, on tmpfs so every start is a clean
 `initdb`. Run this from the repository root:
 
 ```sh
@@ -57,7 +57,7 @@ scripts/test-db.sh up person/person-service-with-axum
  Container mxi-person-test-db Started
 test-db: waiting for mxi-person-test-db...
 test-db: mxi-person-test-db ready
-  DB_URL=postgres://loco:loco@localhost:5432/person_service_test
+  DB_URL=postgres://postgres:postgres@localhost:5432/person_service_test
 ```
 
 person-service's own [`README.md`](../person/person-service-with-axum/README.md)
@@ -81,7 +81,7 @@ running it explicitly first makes the empty-database state visible):
 
 ```sh
 cd person/person-service-with-axum
-export DB_URL=postgres://loco:loco@localhost:5432/person_service_test
+export DB_URL=postgres://postgres:postgres@localhost:5432/person_service_test
 cargo run -- db migrate
 ```
 
@@ -125,7 +125,7 @@ curl -s http://localhost:5150/api/health
 
 ```sh
 cd person/person-service-with-axum   # if not already there
-DB_URL=postgres://loco:loco@localhost:5432/person_service_test \
+DB_URL=postgres://postgres:postgres@localhost:5432/person_service_test \
   cargo run -- task seed_examples
 ```
 

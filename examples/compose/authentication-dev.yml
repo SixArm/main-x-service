@@ -46,8 +46,8 @@ services:
     image: docker.io/library/postgres:18-alpine
     container_name: mxi-example-authentication-dev-postgres
     environment:
-      POSTGRES_USER: loco
-      POSTGRES_PASSWORD: loco
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
       POSTGRES_DB: authentication_service_development
     volumes:
       # PGDATA lives under /var/lib/postgresql in the postgres:18 image
@@ -56,7 +56,7 @@ services:
       # start (agents/share/postgresql.md).
       - postgres_data:/var/lib/postgresql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U loco -d authentication_service_development"]
+      test: ["CMD-SHELL", "pg_isready -U postgres -d authentication_service_development"]
       interval: 2s
       timeout: 3s
       retries: 30
@@ -83,7 +83,7 @@ services:
       # container is the container's own loopback and unreachable
       # through the port forward. Listen on every interface instead.
       BINDING: 0.0.0.0
-      DB_URL: postgresql://loco:loco@postgres:5432/authentication_service_development
+      DB_URL: postgresql://postgres:postgres@postgres:5432/authentication_service_development
       AUTH_ALLOWED_FRONTENDS: ${AUTH_ALLOWED_FRONTENDS:-http://localhost:4173}
       RUST_LOG: ${RUST_LOG:-info}
       # No TOKEN_PRIVATE_KEY_SEED here: SEC-A1's fail-closed dev-seed

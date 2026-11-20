@@ -35,8 +35,8 @@ prior RS256 JWT model is decommissioned), not the database.
   (`person_service_development`, `organization_service_test`, …);
   `case_folder_<env>` for the case-folder app. Production names come from
   `DB_URL`.
-- **Roles (dev defaults).** controller-style services default to `loco`/`loco`;
-  case-folder to `postgres`/`postgres`; the older Axum services to peer
+- **Roles (dev defaults).** controller-style services and case-folder default to
+  `postgres`/`postgres`; the older Axum services to peer
   auth as `$USER` (`postgres://localhost/<db>`). All overridable via
   `DB_URL`.
 - The full database list and a provisioning script are maintained with the

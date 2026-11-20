@@ -247,7 +247,7 @@ Hosted CI still runs on every push. See
 
 `test-db` needs a Postgres, so **every service crate carries a
 `compose.test.yaml`** — one `postgres:18-alpine` container with the same
-superuser (`loco`/`loco`), port (5432), database name, and extensions CI
+superuser (`postgres`/`postgres`), port (5432), database name, and extensions CI
 provides, and its data directory on tmpfs so every start is a clean
 initdb. Podman, not Docker.
 

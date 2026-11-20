@@ -275,8 +275,8 @@ jobs:
       postgres:
         image: postgres:18
         env:
-          POSTGRES_USER: loco
-          POSTGRES_PASSWORD: loco
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
           POSTGRES_DB: postgres
         ports: ['5432:5432']
         options: >-
@@ -286,8 +286,8 @@ jobs:
           --health-retries 10
     env:
       POSTGRES_HOST: localhost
-      POSTGRES_USER: loco
-      POSTGRES_PASSWORD: loco
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
     steps:
       - uses: actions/checkout@v7
       - name: free disk space (drop preinstalled runner bloat this repo never touches)
