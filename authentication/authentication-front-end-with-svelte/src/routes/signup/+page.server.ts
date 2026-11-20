@@ -3,17 +3,23 @@
 // optional name, and the UI locale; no credential is held client-side.
 
 import type { Actions, PageServerLoad } from "./$types";
+import { error } from "@sveltejs/kit";
+import { PUBLIC_MAGIC_LINK_SIGNIN_ENABLED } from "$app/env/public";
+import { magicLinkEnabled } from "#lib/magic-link.js";
 import { signup } from "#lib/server/auth.js";
 
 // `page.data.title` convention (see `../+layout.svelte`): mirrors this
 // route's own <svelte:head><title> so SharePicker gets the right title
 // without reading the DOM.
 export const load: PageServerLoad = () => {
+  if (!magicLinkEnabled(PUBLIC_MAGIC_LINK_SIGNIN_ENABLED)) error(404);
   return { title: "Create account — Main X Auth" };
 };
 
 export const actions: Actions = {
   default: async ({ request, fetch }) => {
+    // The auth service has no issuance route in this mode (NWS-A3).
+    if (!magicLinkEnabled(PUBLIC_MAGIC_LINK_SIGNIN_ENABLED)) error(404);
     const form = await request.formData();
     const email = String(form.get("email") ?? "").trim();
     const nameRaw = String(form.get("name") ?? "").trim();

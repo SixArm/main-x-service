@@ -10,6 +10,12 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — SSO-only mode (T-14)
+
+- `PUBLIC_MAGIC_LINK_SIGNIN_ENABLED=false` hides the email form and
+  sign-up, and `/signup` answers 404, to pair with the auth service's
+  `AUTH_MAGIC_LINK_ENABLED=false`. Unset keeps today's behaviour.
+
 ### Changed
 
 - Read an error's reason from the RFC 9457 problem the service now answers

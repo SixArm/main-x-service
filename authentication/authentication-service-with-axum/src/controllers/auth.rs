@@ -814,12 +814,29 @@ async fn delete_account(
 /// `/api/auth`: signup, magic-link request, redeem, me, signout, the
 /// system-wide audit feed, and the bearer-gated GDPR account routes
 /// (export / per-subject audit / erasure).
+///
+/// Reads `AUTH_MAGIC_LINK_ENABLED` ([`crate::magic_link`]). The server's
+/// boot has already refused a malformed value, so one that is still
+/// malformed here (a test boot) is treated as off: fail closed.
+#[must_use]
 pub fn routes() -> Routes {
-    let routes = Routes::new()
-        .prefix("/api/auth")
-        .add("/signup", post(signup))
-        .add("/magic-link", post(request_magic_link))
-        .add("/magic-link/{token}", get(verify));
+    routes_with(crate::magic_link::enabled_from_env().unwrap_or(false))
+}
+
+/// [`routes`] with the magic-link setting given. With `magic_link` off,
+/// signup and magic-link issuance are not mounted; the redeem route
+/// stays, because the OIDC callback hands its user over through it.
+#[must_use]
+pub fn routes_with(magic_link: bool) -> Routes {
+    let routes = Routes::new().prefix("/api/auth");
+    let routes = if magic_link {
+        routes
+            .add("/signup", post(signup))
+            .add("/magic-link", post(request_magic_link))
+    } else {
+        routes
+    };
+    let routes = routes.add("/magic-link/{token}", get(verify));
     // Session -> PASETO exchange exists only with the `paseto` feature;
     // without it the route is absent (404).
     #[cfg(feature = "paseto")]
@@ -837,7 +854,45 @@ pub fn routes() -> Routes {
 mod tests {
     #[cfg(feature = "paseto")]
     use super::csrf_token_gate;
-    use super::{choose_frontend, claims_have_admin, constant_work_hash, log_magic_link_url};
+    use super::{
+        choose_frontend, claims_have_admin, constant_work_hash, log_magic_link_url, routes_with,
+    };
+
+    fn mounted(magic_link: bool) -> Vec<(String, Vec<String>)> {
+        routes_with(magic_link)
+            .handlers
+            .iter()
+            .map(|h| (h.uri.clone(), h.methods()))
+            .collect()
+    }
+
+    fn has(routes: &[(String, Vec<String>)], uri: &str, method: &str) -> bool {
+        routes
+            .iter()
+            .any(|(u, m)| u == uri && m.iter().any(|x| x.eq_ignore_ascii_case(method)))
+    }
+
+    #[test]
+    fn magic_link_on_mounts_issuance() {
+        let routes = mounted(true);
+        assert!(has(&routes, "/signup", "POST"));
+        assert!(has(&routes, "/magic-link", "POST"));
+        assert!(has(&routes, "/magic-link/{token}", "GET"));
+    }
+
+    // NWS-A3: no local login, but the OIDC hand-off still redeems.
+    #[test]
+    fn magic_link_off_drops_issuance_and_keeps_redeem() {
+        let routes = mounted(false);
+        assert!(!routes.iter().any(|(u, _)| u == "/signup"), "{routes:?}");
+        assert!(
+            !routes.iter().any(|(u, _)| u == "/magic-link"),
+            "{routes:?}"
+        );
+        assert!(has(&routes, "/magic-link/{token}", "GET"));
+        assert!(has(&routes, "/me", "GET"));
+        assert!(has(&routes, "/signout", "POST"));
+    }
     use crate::auth::Claims;
     use axa::Environment;
     #[cfg(feature = "paseto")]

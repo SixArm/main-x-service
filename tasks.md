@@ -8895,10 +8895,18 @@ Kept as they were by worker's SQ-1, then fixed (crate spec §13).
 > Cyber Essentials Plus, ISO 27001, vetting, incident plan) are not
 > tasks here.
 
-- [ ] **NW-1 (S)** authentication-service: a setting that turns
+- [x] **NW-1 (S)** authentication-service: a setting that turns
   magic-link sign-in **off**, so an instance federated to Entra ID
   accepts no local login. Refuse to boot with it off and no IdP
-  configured, which would lock everyone out. NWS-A3.
+  configured, which would lock everyone out. NWS-A3. **Done
+  2026-11-20:** `AUTH_MAGIC_LINK_ENABLED=false` (auth-service spec §13
+  NW-1), with `PUBLIC_MAGIC_LINK_SIGNIN_ENABLED` in
+  authentication-front-end (its §13 T-14).
+- [ ] **NW-1b (S)** The other front ends that run their own magic-link
+  sign-in (worker, person, organization first, as the HR scope; then
+  the rest) take the same `PUBLIC_MAGIC_LINK_SIGNIN_ENABLED`, so an
+  SSO-only instance shows none of them an email form that can only
+  `404`. Per-project, drift accepted. NWS-A3.
 - [ ] **NW-2 (M)** authentication-service OIDC: optionally require that
   the ID token shows MFA (`amr` and/or `acr`, values configurable,
   since Entra ID reports them its own way) and refuse and audit a

@@ -137,6 +137,14 @@ removed templates — it renders from the `src/i18n.rs` catalog (§6.11).
 2. `POST /api/auth/magic-link {email, locale?}` — issue a magic link for
    an existing account. Always `200`. `locale` behaves exactly as in
    §6.1.
+   **Both issuance routes (§6.1, §6.2) are absent (`404`) when
+   `AUTH_MAGIC_LINK_ENABLED=false`**, for an instance whose only sign-in
+   is an enterprise IdP (§13 NW-1). The redeem route (§6.3) stays: the
+   OIDC callback hands its user over through it, and with email issuance
+   gone only the IdP can mint a token. The server refuses to start with
+   the setting malformed (anything but `true`/`false`/`1`/`0`), or off
+   with no OIDC configuration, rather than offering a login nobody meant
+   to, or none at all.
 3. `GET /api/auth/magic-link/{token}` — validate the (unexpired) token,
    mark the email verified, **create a session row and set the
    `__Host-mxi_session` cookie** (HttpOnly/Secure/SameSite/`Path=/`),
@@ -589,6 +597,23 @@ per-subject `GET /api/auth/account/audit` — a subject's own trail reachable
 only by that subject.
 
 ## 13. Tasks (live work queue)
+
+- [x] **2026-11-20 — NW-1: magic-link sign-in can be turned off.**
+      `AUTH_MAGIC_LINK_ENABLED=false` leaves `POST /api/auth/signup` and
+      `POST /api/auth/magic-link` unmounted (§6.1–§6.2), so an instance
+      federated to an enterprise IdP accepts no local login
+      ([`spec/nhs-wales-supplier-assurance`](../../../spec/nhs-wales-supplier-assurance/index.md)
+      NWS-A3). Redeem stays mounted for the OIDC bridge. `start` refuses
+      a malformed value, and refuses `false` unless the `oidc` feature is
+      built and `AUTH_OIDC_*` is complete. `src/magic_link.rs`,
+      `controllers::auth::routes_with`. **Verified:** unit tests for
+      parsing, the no-sign-in refusal and the mounted routes; a live
+      server answering `404` to both issuance routes with the setting
+      off and `200` by default, and refusing to boot on `flase` and on
+      `false` with no IdP; the seven DB-gated `requests::oidc::*` tests,
+      including the full callback → redeem → session bridge, run green
+      **with the setting off**. The sibling front end's matching
+      `PUBLIC_MAGIC_LINK_SIGNIN_ENABLED` landed with it.
 
 - [x] **2026-11-08 — AU-G1: GDPR erasure is one transaction.**
       `DELETE /api/auth/account` ran its four statements (revoke the
@@ -1411,7 +1436,8 @@ alternative front door onto the same session, reached via a
 magic-link bridge token rather than a direct cross-origin cookie set
 (§13's 2026-09-19 follow-up); the sibling front end's IdP-initiated
 "Sign in with SSO" link (§7a rollout step 3) has also landed, opt-in
-via `PUBLIC_OIDC_SIGNIN_ENABLED`. Magic link stays the default.
+via `PUBLIC_OIDC_SIGNIN_ENABLED`. Magic link stays the default, and a
+deployment can turn it off (`AUTH_MAGIC_LINK_ENABLED=false`, §13 NW-1).
 **SAML 2.0 SP is not implemented — evaluated and deliberately deferred**
 (§13's 2026-09-19 entry): no Rust crate today clears the "vetted,
 pure-Rust, owns the crypto" bar `openidconnect` cleared for OIDC

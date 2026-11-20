@@ -38,6 +38,8 @@ pub mod hash;
 pub mod i18n;
 /// axa app initializers.
 pub mod initializers;
+/// Whether this deployment accepts magic-link sign-in (`AUTH_MAGIC_LINK_ENABLED`).
+pub mod magic_link;
 /// Mailers (magic-link / welcome emails).
 pub mod mailers;
 /// Prometheus metrics registry + `/metrics.prom` rendering.

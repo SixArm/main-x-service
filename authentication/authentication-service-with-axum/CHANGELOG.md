@@ -10,6 +10,15 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — turn magic-link sign-in off (NW-1)
+
+- `AUTH_MAGIC_LINK_ENABLED=false` unmounts `POST /api/auth/signup` and
+  `POST /api/auth/magic-link`, so an instance federated to an enterprise
+  IdP accepts no local login. The redeem route stays for the OIDC
+  bridge. `start` refuses a malformed value, and refuses `false` without
+  the `oidc` feature and a complete `AUTH_OIDC_*` configuration. Unset
+  keeps today's behaviour.
+
 ### Changed — axa 0.11
 
 - `axa` 0.10 → 0.11 and `axa-test` 0.1 → 0.2. **Deploy settings change before

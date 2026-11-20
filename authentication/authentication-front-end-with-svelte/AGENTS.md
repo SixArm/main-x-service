@@ -145,7 +145,10 @@ Configure the auth-service base URL with `AUTH_API_URL` (see
 `.env.example`; NOT `PUBLIC_API_BASE_URL` — see Ground rule 6). Set
 `PUBLIC_OIDC_SIGNIN_ENABLED=true` to show the "Sign in with SSO" link
 (EV-2) — only when the paired auth-service deployment has its own
-`AUTH_OIDC_*` variables configured.
+`AUTH_OIDC_*` variables configured. Set
+`PUBLIC_MAGIC_LINK_SIGNIN_ENABLED=false` (with the SSO link on) when the
+auth service runs with `AUTH_MAGIC_LINK_ENABLED=false`: the email form,
+sign-up link and `/signup` go away (spec §13 T-14).
 
 `pnpm run test:e2e` (playwright) is **green (14/14, as of AFE-1)** — the
 `6/6` this line once said was stale even before AFE-1: AFE-3 had already

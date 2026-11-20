@@ -190,6 +190,7 @@ siblings' — there is no `<P>_` pattern to fit into.
 | `AUTH_ALLOWED_ORIGINS` | unset ⇒ permissive in dev, **warns** (does not fail closed) in production | CSRF/origin backstop on `POST /token`; when set, a non-matching `Origin` is rejected outright (SEC-A10) |
 | `AUTH_ATTRIBUTE_VOCABULARY` | unrestricted | Inline JSON allow-set of attribute keys→values for the operator attribute-assignment surfaces |
 | `AUTH_ATTRIBUTE_VOCABULARY_FILE` | — | Path form; inline wins |
+| `AUTH_MAGIC_LINK_ENABLED` | `true` | `false` removes magic-link signup and issuance (`404`), for an instance whose only sign-in is the IdP; redeem stays for the OIDC bridge. Any value but `true`/`false`/`1`/`0` stops boot, as does `false` without a complete `AUTH_OIDC_*` configuration |
 | `AUTH_OIDC_ISSUER_URL` | unset ⇒ OIDC federation dormant (needs the `oidc` cargo feature) | OIDC provider issuer, e.g. a Keycloak realm URL; discovery is `{issuer}/.well-known/openid-configuration` |
 | `AUTH_OIDC_CLIENT_ID` | — | This service's registered OAuth2 client id |
 | `AUTH_OIDC_CLIENT_SECRET_FILE` | — | File holding the client secret; outranks `AUTH_OIDC_CLIENT_SECRET` |
@@ -199,7 +200,9 @@ siblings' — there is no `<P>_` pattern to fit into.
 | `AUTH_OIDC_JIT_PROVISIONING` | off | `1`/`true` auto-creates an account on a first federated sign-in; default answers `403` |
 
 Front-end side (each SvelteKit app, not the service): `PUBLIC_OIDC_SIGNIN_ENABLED=true`
-shows the "Sign in with SSO" link. Setup end to end:
+shows the "Sign in with SSO" link. In authentication-front-end,
+`PUBLIC_MAGIC_LINK_SIGNIN_ENABLED=false` hides the email form and sign-up,
+to pair with `AUTH_MAGIC_LINK_ENABLED=false`. Setup end to end:
 [`runbooks/keycloak-sso.md`](runbooks/keycloak-sso.md).
 
 [`authentication-sessions.md`](authentication-sessions.md) is the

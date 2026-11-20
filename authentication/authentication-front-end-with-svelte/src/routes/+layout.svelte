@@ -9,6 +9,8 @@
   import type { LayoutData } from "./$types";
   import PickerBar from "@lilydesignsystem/svelte-picker-bar";
   import type { ShareTarget } from "@lilydesignsystem/svelte-share-picker";
+  import { PUBLIC_MAGIC_LINK_SIGNIN_ENABLED } from "$app/env/public";
+  import { magicLinkEnabled } from "#lib/magic-link.js";
 
   // Share destinations for the Lily SharePicker. Lily ships no
   // third-party URLs — each `href` builder is ours. `url`/`title` are
@@ -87,7 +89,9 @@
     ]
     : [
       { href: "/", key: "nav.home" },
-      { href: "/signup", key: "nav.signup" },
+      ...(magicLinkEnabled(PUBLIC_MAGIC_LINK_SIGNIN_ENABLED)
+        ? [{ href: "/signup", key: "nav.signup" as StringKey }]
+        : []),
                   { href: "/tour", key: "nav.tour" },
               ],
     );

@@ -12,6 +12,14 @@ vi.mock("$app/state", () => ({
 // locale instead of touching `localStorage` at import time.
 vi.mock("$app/environment", () => ({ browser: false }));
 
+// PUBLIC_MAGIC_LINK_SIGNIN_ENABLED decides whether the nav offers Sign up.
+const mockEnv: { PUBLIC_MAGIC_LINK_SIGNIN_ENABLED?: string } = {};
+vi.mock("$app/env/public", () => ({
+  get PUBLIC_MAGIC_LINK_SIGNIN_ENABLED() {
+    return mockEnv.PUBLIC_MAGIC_LINK_SIGNIN_ENABLED;
+  },
+}));
+
 import Layout from "../../src/routes/+layout.svelte";
 
 afterEach(cleanup);
@@ -76,5 +84,23 @@ describe("+layout header end", () => {
     const btn = container.querySelector(".header-end button.session-button");
     expect(btn?.textContent?.trim()).toBe("Sign out");
     expect(container.querySelector(".header-end a.session-button")).toBeNull();
+  });
+});
+
+// SSO-only deployments (NWS-A3) have no sign-up route, so no link to one.
+describe("+layout sign-up link", () => {
+  afterEach(() => {
+    delete mockEnv.PUBLIC_MAGIC_LINK_SIGNIN_ENABLED;
+  });
+
+  it("is in the nav by default", () => {
+    const { container } = render(Layout, { children, data: { user: null } });
+    expect(container.querySelector('nav a[href="/signup"]')).toBeTruthy();
+  });
+
+  it("is absent with magic links off", () => {
+    mockEnv.PUBLIC_MAGIC_LINK_SIGNIN_ENABLED = "false";
+    const { container } = render(Layout, { children, data: { user: null } });
+    expect(container.querySelector('nav a[href="/signup"]')).toBeNull();
   });
 });

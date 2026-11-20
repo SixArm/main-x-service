@@ -2,10 +2,12 @@
   import type { ActionData } from "./$types";
   import { enhance } from "$app/forms";
   import { i18n, t } from "#lib/i18n.svelte.js";
-  import { PUBLIC_OIDC_SIGNIN_ENABLED } from '$app/env/public';
+  import { PUBLIC_MAGIC_LINK_SIGNIN_ENABLED, PUBLIC_OIDC_SIGNIN_ENABLED } from '$app/env/public';
+  import { magicLinkEnabled } from "#lib/magic-link.js";
 
   let { form }: { form: ActionData } = $props();
   const ssoEnabled = PUBLIC_OIDC_SIGNIN_ENABLED === "true";
+  const emailEnabled = magicLinkEnabled(PUBLIC_MAGIC_LINK_SIGNIN_ENABLED);
 </script>
 
 <!--
@@ -24,6 +26,9 @@
   do this hop: the browser itself must visit the identity provider and
   come back. Shown only when `PUBLIC_OIDC_SIGNIN_ENABLED` is set (see
   `.env.example`) — magic link stays the default, federation is opt-in.
+
+  With `PUBLIC_MAGIC_LINK_SIGNIN_ENABLED=false` the email form and the
+  create-account link are not shown: SSO is the only way in.
 -->
 <svelte:head><title>{t("signin.title")} — {t("brand")}</title></svelte:head>
 
@@ -32,6 +37,7 @@
 {#if form?.sent}
     <p class="banner">{t("signin.sent")}</p>
 {:else}
+  {#if emailEnabled}
   <form class="stack" method="POST" use:enhance>
     <label>
       {t("signin.email")} 
@@ -45,12 +51,15 @@
       <p class="banner" role="alert">{t("signin.failed")}</p>
     {/if}
   </form>
+  {/if}
   {#if ssoEnabled}
         <p>
             <a class="button" href="/signin/sso">{t("signin.sso")}</a>
         </p>
   {/if}
+  {#if emailEnabled}
   <p>
         <small>{t("signin.noAccount")} <a href="/signup">{t("signin.create")}</a></small>
   </p>
+  {/if}
 {/if}

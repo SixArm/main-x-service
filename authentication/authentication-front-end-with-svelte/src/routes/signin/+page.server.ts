@@ -3,6 +3,9 @@
 // only carries an email + the UI locale (email language).
 
 import type { Actions, PageServerLoad } from "./$types";
+import { error } from "@sveltejs/kit";
+import { PUBLIC_MAGIC_LINK_SIGNIN_ENABLED } from "$app/env/public";
+import { magicLinkEnabled } from "#lib/magic-link.js";
 import { requestMagicLink } from "#lib/server/auth.js";
 
 // `page.data.title` convention (see `../+layout.svelte`): mirrors this
@@ -14,6 +17,8 @@ export const load: PageServerLoad = () => {
 
 export const actions: Actions = {
   default: async ({ request, fetch }) => {
+    // The auth service has no issuance route in this mode (NWS-A3).
+    if (!magicLinkEnabled(PUBLIC_MAGIC_LINK_SIGNIN_ENABLED)) error(404);
     const form = await request.formData();
     const email = String(form.get("email") ?? "").trim();
     const localeRaw = form.get("locale");

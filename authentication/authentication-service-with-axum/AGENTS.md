@@ -226,6 +226,7 @@ config/                    development/production/test yaml (keys/ holds only a 
 | `AUTH_INTEGRITY_MAC_KEYS_RETIRED` | — | Comma-separated retired key material, still verifiable, no longer used to sign. |
 | `FRONTEND_URL` | `http://localhost:5173` | Base for the magic link in emails/logs; also the redirect target after a successful OIDC sign-in. |
 | `DB_URL` | axa config default | Postgres connection. |
+| `AUTH_MAGIC_LINK_ENABLED` | `true` | `false` unmounts `POST /api/auth/signup` and `POST /api/auth/magic-link` (`404`), for an SSO-only instance; redeem stays for the OIDC bridge. `start` refuses any other value, and refuses `false` without a complete OIDC configuration (spec §13 NW-1). |
 | `AUTH_OIDC_ISSUER_URL` | — | **EV-2** (`oidc` Cargo feature, off by default). The IdP's issuer URL, used for OIDC discovery. Unset ⇒ `/api/auth/oidc/*` is `404` — federation is opt-in per deployment even with the feature compiled in. |
 | `AUTH_OIDC_CLIENT_ID` | — | This service's registered OAuth2 client id at the IdP. |
 | `AUTH_OIDC_CLIENT_SECRET` | — | This service's client secret, inline. `AUTH_OIDC_CLIENT_SECRET_FILE` takes precedence when both are set. |

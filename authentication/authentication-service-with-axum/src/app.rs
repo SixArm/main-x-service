@@ -187,6 +187,12 @@ impl App {
         #[cfg(feature = "paseto")]
         crate::auth::ensure_signing_seed(environment.is_production_like())
             .map_err(|error| Error::Message(error.to_string()))?;
+        // NWS-A3: a malformed AUTH_MAGIC_LINK_ENABLED, or magic links off
+        // with no identity provider, stops the server rather than serving a
+        // login nobody meant to offer or none at all.
+        if matches!(cli.command, Command::Start { .. }) {
+            crate::magic_link::ensure_from_env().map_err(Error::Message)?;
+        }
         let mut config = ServiceConfig::from_env(&environment, &defaults())?;
         if let Command::Start { binding, port, .. } = &cli.command {
             if let Some(binding) = binding {

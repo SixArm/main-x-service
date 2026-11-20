@@ -292,7 +292,10 @@ one.
   operator's typo, and gets the same protection.
 - **Magic link stays the default.** Federation is opt-in, configured
   per deployment; a deployment that configures nothing behaves exactly
-  as it does today.
+  as it does today. A deployment that must accept **only** the IdP sets
+  `AUTH_MAGIC_LINK_ENABLED=false`: signup and magic-link issuance are
+  then not mounted, while the redeem route stays for the bridge below
+  (2026-11-20, NHS Wales NWS-A3).
 
 **Non-goals**
 
