@@ -51,7 +51,7 @@ singletons (`SearchEngine`, `CourseMatcher`, domain `Config`,
 `AppContext` shared store, retrieved via `FromRef<AppContext>`.
 Swagger UI + CORS are layered on top there.
 
-This crate is the **family reference** for the idiomatic-loco
+This crate is the **family reference** for the axa
 controller conversion — when converting a sibling service, copy this
 shape. See [`agents/share/axa.md`](../../agents/share/axa.md).
 

@@ -17,7 +17,7 @@ a reference UI.
 The cross-cutting domain (entities, NHS Number rules, invariants, use
 cases, regulatory frame) lives in the
 [root specification](../../spec/index.md). This subproject **mirrors**
-that domain and adds **stack-specific** detail: Loco hooks, route
+that domain and adds **stack-specific** detail: axa boot, route
 shapes, JSON contracts, upstream-service client interfaces.
 
 ## Specification (topic files)
@@ -50,6 +50,6 @@ shapes, JSON contracts, upstream-service client interfaces.
 
 ## References
 
-- [axa docs](https://axa/docs) · [axa GitHub](https://github.com/axa/loco)
+- [axa docs](https://docs.rs/axa) · [axa GitHub](https://github.com/publicprojects-io/axa)
 - [Root specification](../../spec/index.md) · [Svelte sibling](../../case-folder-front-end-with-svelte/spec/index.md)
 - [UK NHS Number](https://en.wikipedia.org/wiki/NHS_number) · [NHS Synthetic Data](https://digital.nhs.uk/services/synthetic-data)

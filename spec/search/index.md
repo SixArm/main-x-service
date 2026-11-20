@@ -305,7 +305,7 @@ search  ──►  candidate set        (Tantivy fuzzy/phonetic, all ten registr
   `409 Conflict` with the matches (the entity services that wire this).
 - **Batch dedup** — `POST /<plural>/deduplicate` scans the corpus and
   queues review-queue items. Implemented on the MPI-lineage services and
-  on **organization** (the only loco-lineage crate with this endpoint
+  on **organization** (the only controller-style crate with this endpoint
   today); care-pathway, case, and portfolio do not yet expose it — see
   [`spec/merge/index.md`](../merge/index.md) §4, §9.
 

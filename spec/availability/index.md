@@ -119,7 +119,7 @@ container is marked unhealthy.
 ## 4. Graceful shutdown & non-root execution
 
 - **Graceful shutdown.** Services drain in-flight requests on `SIGTERM`
-  / `SIGINT` (Axum/loco shutdown signal) rather than dropping
+  / `SIGINT` (Axum/axa shutdown signal) rather than dropping
   connections, so rolling deploys and replica scale-down do not return
   errors to in-flight callers. In-flight DB transactions either commit
   or roll back cleanly; pool connections close on drain.

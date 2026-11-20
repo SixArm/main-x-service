@@ -29,9 +29,8 @@ revoke, and one set of keys to trust.
 > ([`../../spec/index.md`](../../spec/index.md)) carries the full
 > contract; this file mirrors it.
 
-It is also the family's **reference axa application**. The existing
-service crates declare `axa` but run hand-rolled Axum; they will be
-converted to idiomatic Loco using this crate as the template.
+It is also the family's **reference axa application**: the shape the
+other service crates follow.
 
 ## 2. Scope
 
@@ -400,7 +399,7 @@ security scheme, and the schemas.
 
 A separate `GET /metrics.prom` (root, unauthenticated) serves the
 Prometheus registry (see §6.10) — not JSON, so it sits outside the
-loco-JSON envelope above.
+bare-JSON envelope above.
 
 ## 10. Persistence
 
@@ -1431,8 +1430,8 @@ pattern, and RS256 + JWKS decommissioned — per
 [`agents/share/authentication-sessions.md`](../../../agents/share/authentication-sessions.md).
 This **supersedes** the JWT model. The CSRF synchroniser token +
 origin backstop and the sessions-table TTL reshape have both landed;
-remaining v0.2 items: Mailpit, an auto-rotation scheduler. v0.3: begin
-Loco conversion of the sibling services using this as the template
+remaining v0.2 items: Mailpit, an auto-rotation scheduler. v0.3: convert
+the sibling services using this as the template
 (peers adopt the PASETO `authentication-verifier`); **ABAC** — both
 the sourcing side (attributes → session → `attrs` claim) *and* the
 operator attribute-assignment surface (CLI task + HTTP admin API) have

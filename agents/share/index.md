@@ -85,6 +85,6 @@ Per-crate `spec.md`:
 | [runbooks/bulk-job-recovery.md](runbooks/bulk-job-recovery.md) | Runbook: bulk import/export job failure recovery — how a lost job reaches `failed`, stable-key vs idempotency-key, symptom → check → action |
 | [security.md](security.md)                                       | Security audit summary, cross-cutting invariants, the `<ENTITY>_REQUIRE_AUTH` activation gate, secret-handling, threat model |
 | [rust-axum-stack.md](rust-axum-stack.md)                         | Stack for Rust, axa (database, search, …)             |
-| [loco.md](axa.md)                                               | axa framework (backend-only conventions)              |
+| [axa.md](axa.md)                                               | axa framework (backend-only conventions)              |
 | [svelte-front-end-stack.md](svelte-front-end-stack.md)           | Front-end Lily package distribution: registry versions vs `file:`, `pnpm link` for local dev against an in-flight Lily change |
 | [configuration.md](configuration.md)                             | Complete environment-variable reference — every `<ENTITY>_*`, `LINK_GRAPH_*`, `TOKEN_*`/`AUTH_*` variable, default, effect, governing doc |

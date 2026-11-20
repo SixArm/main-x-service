@@ -7,9 +7,9 @@
 //!
 //! The heavy lifting (OIDC discovery, JWKS caching, signature and
 //! audience checks) is [`axum-keycloak-auth`], the engine that
-//! `loco-keycloak-auth` wraps; that wrapper is written against axa
-//! types and cannot be used from an axa 1.x service, so this module uses
-//! the engine directly.
+//! `loco-keycloak-auth` wraps; that wrapper is written against Loco.rs
+//! types, which this family does not use, so this module uses the engine
+//! directly.
 //!
 //! What this module adds on top, fail-closed:
 //!

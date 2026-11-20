@@ -361,7 +361,7 @@ attribute values, so it is safe for 403 bodies and audit trails.
 - [x] **KC-1: `keycloak` feature + `paseto` as a feature (2026-09-29).**
       `paseto` (default on) gates `rusty_paseto`/`Verifier`; `keycloak`
       (off) adds `keycloak::KeycloakVerifier` on `axum-keycloak-auth`
-      (not `loco-keycloak-auth`, which is typed against axa).
+      (not `loco-keycloak-auth`, which is typed against Loco.rs).
       Tests: `keycloak` unit tests plus `tests/keycloak_e2e.rs`
       (real RS256 JWTs against a local OIDC discovery + JWKS server).
       Not published: the crate is still consumed in-tree by `path`.

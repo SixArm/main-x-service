@@ -27,45 +27,9 @@ in this session.
 | Rust (this repo pins `1.96.1` in [`rust-toolchain.toml`](../rust-toolchain.toml)) | builds and runs case-service directly | `cargo` on `PATH` |
 | `curl` + `python3` (for `python3 -m json.tool`) | verifies everything live | whatever your OS ships |
 
-## A correction before starting: `cargo axa` actually does work here — for a narrower reason than it sounds
-
-Every prior tutorial that touched `cargo run -- …` (TUT-2, TUT-3, TUT-5)
-found it fails with "no such command: `loco`" and used `cargo run --
-…` instead, because no global `cargo-loco` plugin binary is installed in
-this environment. That finding still holds **in general** — but it turns
-out not to hold for this crate specifically, and the reason is worth
-being precise about rather than re-asserting the old blanket claim:
-
-```sh
-cd case/case-service-with-axum
-```
-
-```
-    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1.10s
-     Running `target/debug/case-service --version`
-```
-
-That ran. Looking at why: `case/case-service-with-axum/.cargo/config.toml`
-carries
-
-```toml
-[alias]
-axa = "run --"
-```
-
-— a **repo-local Cargo alias**, not the missing global plugin. It makes
-`cargo run -- X` expand to exactly `cargo run -- X` for *this crate only*,
-so `cargo run -- start` and `cargo run -- db migrate` genuinely work here
-(confirmed live below) for the same reason `cargo run -- start` always
-has. It is present in case-service and authentication-service (both
-newer, loco-scaffolded crates) but **absent** from person/worker/place's
-`.cargo/config.toml` (older, hand-converted crates) — so the "no
-`cargo-loco` shim" finding from earlier tutorials was correct for the
-crates those tutorials used, and this tutorial's crate is simply a
-different case. This tutorial still writes every command as
-`cargo run -- …` throughout, both to stay literally accurate about what
-is and isn't installed, and because that form works identically on every
-crate in the family regardless of which one happens to carry the alias.
+Every command below is written as `cargo run -- …`, the same form the
+earlier tutorials (TUT-2, TUT-3, TUT-5) use; it works identically on
+every crate in the family.
 
 ## 1. Start Postgres and case-service, with the outbox transport and the relay on
 

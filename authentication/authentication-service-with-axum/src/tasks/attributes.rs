@@ -14,19 +14,19 @@
 //!
 //! ```text
 //! # show one user's current attributes
-//! cargo axa task user_attributes email:alice@example.com
-//! cargo axa task user_attributes op:show pid:0c4f1e2a-…
+//! cargo run -- task user_attributes email:alice@example.com
+//! cargo run -- task user_attributes op:show pid:0c4f1e2a-…
 //!
 //! # set (replace) one key's value list
-//! cargo axa task user_attributes op:set email:alice@example.com key:access values:write
-//! cargo axa task user_attributes op:set email:alice@example.com key:dept   values:cardiology,oncology
+//! cargo run -- task user_attributes op:set email:alice@example.com key:access values:write
+//! cargo run -- task user_attributes op:set email:alice@example.com key:dept   values:cardiology,oncology
 //!
 //! # grant a machine peer everything
-//! cargo axa task user_attributes op:set email:peer@svc key:svc values:true
+//! cargo run -- task user_attributes op:set email:peer@svc key:svc values:true
 //!
 //! # remove one key, or clear every attribute (back to read-only)
-//! cargo axa task user_attributes op:unset email:alice@example.com key:dept
-//! cargo axa task user_attributes op:clear email:alice@example.com
+//! cargo run -- task user_attributes op:unset email:alice@example.com key:dept
+//! cargo run -- task user_attributes op:clear email:alice@example.com
 //! ```
 //!
 //! The parsing / validation / map-mutation core (`AttrCommand`,

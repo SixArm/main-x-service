@@ -19,7 +19,7 @@ The sign-in account — **not** a person registry record.
   `magic_link_expiration` (now + 5 min); both cleared on redemption.
 - **Verification** — `email_verified_at`, set on first successful
   magic-link redemption.
-- **Legacy loco-starter columns** — `password` (holds an unusable
+- **Legacy scaffold columns** — `password` (holds an unusable
   random Argon2 hash; never checked), `api_key`, `reset_token` /
   `reset_sent_at`, `email_verification_token` /
   `email_verification_sent_at`. Retained to satisfy the schema; no

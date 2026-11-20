@@ -390,7 +390,7 @@ async fn audit_best_effort(
 /// create did not happen when it did. A failure is logged at `ERROR`
 /// (not `WARN`) because the consequence — a live record invisible to
 /// search — is silent until someone notices a missing hit; the repair is
-/// `cargo axa task search_reindex`.
+/// `cargo run -- task search_reindex`.
 fn index_best_effort(pid: Uuid, org: &Organization) {
     let Some(engine) = crate::search::engine() else {
         return;

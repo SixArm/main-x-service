@@ -389,7 +389,7 @@ async fn audit_best_effort(
 /// consequence — a live pathway invisible to search, and so invisible to
 /// the duplicate detector that blocks on the index — is silent until
 /// someone notices a missing hit. The repair is
-/// `cargo axa task search_reindex`.
+/// `cargo run -- task search_reindex`.
 fn index_best_effort(pid: Uuid, pathway: &CarePathway) {
     let Some(engine) = crate::search::engine() else {
         return;

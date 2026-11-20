@@ -63,7 +63,7 @@ pub mod relay;
 pub mod search;
 /// In-memory event stream published on every CRUD action.
 pub mod streaming;
-/// CLI tasks (`cargo axa task <name>`).
+/// CLI tasks (`cargo run -- task <name>`).
 pub mod tasks;
 /// Field-level validation for incoming `Organization` payloads (→ `422`).
 pub mod validation;

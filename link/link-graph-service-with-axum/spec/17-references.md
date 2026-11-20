@@ -34,7 +34,7 @@
 - [compliance-for-healthcare.md](../../../agents/share/compliance-for-healthcare.md)
   / [compliance-for-technology.md](../../../agents/share/compliance-for-technology.md).
 - [rust-axum-stack.md](../../../agents/share/rust-axum-stack.md) —
-  Rust + axa stack; [loco.md](../../../agents/share/axa.md) — axa
+  Rust + axa stack; [axa.md](../../../agents/share/axa.md) — axa
   conventions; [postgresql.md](../../../agents/share/postgresql.md) —
   PostgreSQL.
 - [observability.md](../../../agents/share/observability.md) /

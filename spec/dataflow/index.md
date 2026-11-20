@@ -11,7 +11,7 @@ Two generations of service exist in the repo, and the step *order* is
 the same in both; the per-step *detail* differs:
 
 - **axa services** (authentication, organization, care-pathway,
-  case, and the loco-converted person/worker/place/thing/event/course
+  case, and the converted person/worker/place/thing/event/course
   controllers). The API DTO **is** the matcher type, stored verbatim as
   a single JSONB `data` column. Reference handler:
   [`care-pathway/care-pathway-service-with-axum/src/controllers/care_pathways.rs`](../../care-pathway/care-pathway-service-with-axum/src/controllers/care_pathways.rs).
@@ -22,7 +22,7 @@ the same in both; the per-step *detail* differs:
   **Tantivy**.
 
 Where they differ, the difference is called out under
-[§7 loco-vs-older differences](#7-loco-vs-older-differences). Sibling
+[§7 controller-style vs older differences](#controller-style-vs-older-differences). Sibling
 topic specs hold the deeper per-stage detail:
 [validation](../validation/index.md) ·
 [matching](../matching/index.md) ·
@@ -335,7 +335,7 @@ at `WARN` and never fails the request or rolls back the write. See
 404s on subsequent reads. Merge reuses the same soft-delete on the
 retired duplicate.
 
-### loco-vs-older differences
+### controller-style vs older differences
 
 The pipelines are step-for-step identical; the per-step *detail*
 differs between the two service generations:

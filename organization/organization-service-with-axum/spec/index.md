@@ -237,7 +237,7 @@ the aggregator read-model, **not** stored here. Origination from the org
 side is a roadmap item (umbrella spec §15).
 
 **Bulk import / export (BLK-5, delivered — §10.7, §13).** The family-wide
-contract — async loco-worker jobs, the `bulk_jobs` table, the five
+contract — async axa worker jobs, the `bulk_jobs` table, the five
 `/api/organizations/{import,export,bulk-jobs}` endpoints, idempotent
 upsert-by-key, the per-row error report, and the export privacy/audit
 posture — is fixed in

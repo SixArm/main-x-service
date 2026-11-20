@@ -3,7 +3,7 @@
 | Area | Status |
 |---|---|
 | Skeleton (compiles, binary runs end-to-end) | ✅ |
-| Loco conversion (Hooks boot, native controllers, config/*.yaml, Postgres queue) | ✅ family reference; migrations run by `sqlx::migrate!` since T-31 |
+| axa conversion (axa boot, native controllers, environment configuration, Postgres queue) | ✅ family reference; migrations run by `sqlx::migrate!` since T-31 |
 | Persistence | ✅ `PgCourseRepository`: sqlx `query!` CRUD with transactions, soft delete; 7 row structs (`src/db/models.rs`); plain-SQL `sqlx::migrate!` migrations; all SQL in `src/db/` (§10, T-31) |
 | Repository CRUD | ✅ courses + identifiers + links + instances + merge records; syllabus_sections still UI-only |
 | Search engine | ✅ index / fuzzy / exact / blocking-query / delete |

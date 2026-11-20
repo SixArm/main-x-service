@@ -26,10 +26,10 @@ migration
 | pid | Uuid | Public id — the token `sub` |
 | email | String (unique) | Sign-in identity (personal data) |
 | password | String | Unusable random Argon2 hash — no password flow exists |
-| api_key | String (unique) | loco-starter convention (`lo-{uuid}`) |
+| api_key | String (unique) | legacy scaffold convention (`lo-{uuid}`) |
 | name | String | Display name (defaulted from email local part) |
-| reset_token / reset_sent_at | Option | Legacy loco-starter, unused |
-| email_verification_token / email_verification_sent_at | Option | Legacy loco-starter, unused |
+| reset_token / reset_sent_at | Option | Legacy scaffold, unused |
+| email_verification_token / email_verification_sent_at | Option | Legacy scaffold, unused |
 | email_verified_at | Option\<DateTime\> | Set on first magic-link redemption |
 | magic_link_token | Option\<String\> | Live link token — 32 random chars (`MAGIC_LINK_LENGTH`) |
 | magic_link_expiration | Option\<DateTime\> | Now + 5 min (`MAGIC_LINK_EXPIRATION_MIN`) |

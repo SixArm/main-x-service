@@ -131,7 +131,7 @@ repo-accurate; behaviour noted per generation where it differs.
 | `500` | Internal Server Error | Unexpected server / database error |
 | `401` | Unauthorized | Missing or invalid bearer token on a protected route — see §4 |
 
-Note the loco-vs-older split on create/delete: axa returns `200`
+Note the controller-style vs older split on create/delete: axa returns `200`
 throughout (create `200`+`OrgRef`, delete `200`+empty JSON); the older
 services use `201` for create and `204` for delete.
 
@@ -323,7 +323,7 @@ it in full:
 
 The pre-existing per-endpoint defaults this contract preserves:
 
-- **List caps.** `GET /api/<plural>` is capped (loco: 100 active rows,
+- **List caps.** `GET /api/<plural>` is capped (controller-style: 100 active rows,
   newest first, soft-deleted excluded) as a guard against unbounded
   responses absent `limit`/`offset`. `check-duplicates` does an
   in-memory full scan up to a named cap (`CHECK_DUPLICATES_SCAN_CAP =
@@ -434,7 +434,7 @@ in `src/api/rest/handlers.rs` (older services) or
 - [`../validation/index.md`](../validation/index.md) — validation rules / `422`
 - [`../search/index.md`](../search/index.md) — search params + pagination
 - [`../event-streaming/index.md`](../event-streaming/index.md) — the durable outbox + Fluvio transport (§7.3)
-- [`../merge/index.md`](../merge/index.md) — record merge, including the loco-lineage batch-`deduplicate` gap (§9)
+- [`../merge/index.md`](../merge/index.md) — record merge, including the controller-style batch-`deduplicate` gap (§9)
 - [`../index.md`](../index.md) — monorepo spec index
 - Per-entity API references, e.g.
   [`../../person/person-service-with-axum/agents/restful.md`](../../person/person-service-with-axum/agents/restful.md)

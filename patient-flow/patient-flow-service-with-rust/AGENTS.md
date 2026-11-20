@@ -44,7 +44,7 @@ cross-cutting spec's [scope boundary](../spec/scope.md).
    tracing + OTLP, OpenAPI/Swagger, header API versioning
    (`Accepts-version`), Podman not Docker, PostgreSQL not SQLite,
    `worker` (Postgres-backed) jobs, in-memory axa cache. See
-   [rust-loco-stack](../../agents/share/rust-axum-stack.md).
+   [rust-axum-stack](../../agents/share/rust-axum-stack.md).
 3. **Pure core.** Bed state machine, allocation rules, Red2Green,
    DTOC clock live in `src/flow/` as DB-free pure functions with
    exhaustive unit tests; controllers stay thin (PF-D4).

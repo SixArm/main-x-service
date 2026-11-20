@@ -69,7 +69,7 @@ mints credentials: the **authentication-service**. Everything else
 | Authorization | Each service authorizes **locally** from claims. The auth service issues identity, not roles. | Keeps the SSO minimal; per-entity policy stays in the entity service. |
 
 The auth service is also the family's **reference axa application**;
-the Loco conversion of the peer services adopts its `src/auth.rs`
+the axa conversion of the peer services adopts its `src/auth.rs`
 verification approach via the verifier library.
 
 ```

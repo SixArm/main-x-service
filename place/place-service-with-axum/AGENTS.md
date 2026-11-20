@@ -28,7 +28,7 @@ Shared reference docs live at the project root under
 | [overview.md](../../agents/share/overview.md) | High-level project overview |
 | [architecture.md](../../agents/share/architecture.md) | Layered architecture |
 | [rust-axum-stack.md](../../agents/share/rust-axum-stack.md) | Full Rust + axa dependency stack |
-| [loco.md](../../agents/share/axa.md) | Tech stack summary |
+| [axa.md](../../agents/share/axa.md) | Tech stack summary |
 | [match-search-merge.md](../../agents/share/match-search-merge.md) | Match / search / merge workflows |
 | [match.md](../../agents/share/match.md) | Matching algorithms |
 | [search.md](../../agents/share/search.md) | Search (Tantivy) |

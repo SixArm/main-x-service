@@ -58,7 +58,7 @@ Shared limitations:
 
 The crash window — "DB committed, broker publish not yet sent" — is
 closed with the **transactional outbox** pattern, which fits axa's
-Postgres-backed workers ([loco.md](axa.md)) exactly:
+Postgres-backed workers ([axa.md](axa.md)) exactly:
 
 ```
  ┌── request handler ──────────────────────────────┐
@@ -178,7 +178,7 @@ Implementations:
   handler's transaction; `recent` reads the last N outbox rows. This is
   the durable default in deployment.
 - **Relay** — an axa Postgres-backed worker (`queue.kind: Postgres`,
-  [loco.md](axa.md)) that drains `event_outbox` to a **`FluvioSink`**
+  [axa.md](axa.md)) that drains `event_outbox` to a **`FluvioSink`**
   (feature `fluvio`). The sink, not the request path, holds the Fluvio
   client, so request latency is unaffected and a Fluvio outage only backs
   up the outbox (it never fails a write).

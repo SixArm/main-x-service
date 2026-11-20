@@ -48,7 +48,7 @@ fixes its shape once.
 ## 3. Execution model — async jobs on the axa `worker` feature
 
 Bulk operations run as axa **Postgres-backed background jobs**
-(`queue.kind: Postgres`, [loco.md](axa.md)); no external broker.
+(`queue.kind: Postgres`, [axa.md](axa.md)); no external broker.
 
 ```
 POST /api/<plural>/import   ──202──▶ { job_id }

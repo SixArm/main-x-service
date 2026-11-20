@@ -3,7 +3,7 @@
 //! tutorials (EX-4 in the repo-root `tasks.md`).
 //!
 //! ```text
-//! cargo axa task seed_examples
+//! cargo run -- task seed_examples
 //! ```
 //!
 //! ## Why this bypasses `POST /api/cases`

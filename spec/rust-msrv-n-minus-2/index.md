@@ -58,7 +58,7 @@ change. The reasoning for tightening to N-2:
   on our side becomes an unplanned upgrade on theirs. That is the
   failure N-3 was originally chosen to avoid, and N-2 still avoids it.
 - **N-2 still sits comfortably above the real dependency floor** (§4):
-  as of this change the loco-based services transitively require
+  as of this change the services transitively require
   1.94, so 1.98 clears it by four releases — one more release of
   headroom than N-3 had, not less, because stable itself moved on in
   the interim.

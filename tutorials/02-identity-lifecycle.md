@@ -61,19 +61,9 @@ test-db: mxi-person-test-db ready
 ```
 
 person-service's own [`README.md`](../person/person-service-with-axum/README.md)
-"Local Development" section documents `cargo run -- start`. **That doesn't
-work as written in this environment** — `cargo axa` needs a `cargo-loco`
-shim on `PATH`, and only the standalone `loco` binary (the Postgres/Redis
-generator CLI) is installed here:
-
-```
-$ error: no such command: `loco`
-```
-
-The README's own parenthetical alternative, `cargo run -- start`, is
-what actually works, so that's what this tutorial uses throughout
-(`cargo run -- <subcommand>` for everything — `start`, `db migrate`,
-`task ...`).
+"Local Development" section documents `cargo run -- start`, and this
+tutorial uses `cargo run -- <subcommand>` throughout — `start`,
+`db migrate`, `task ...`.
 
 Point `DB_URL` at the test Postgres and apply migrations
 (`development.yaml`'s `auto_migrate` would also do this on `start`, but

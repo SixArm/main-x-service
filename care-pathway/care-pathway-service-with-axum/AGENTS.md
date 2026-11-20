@@ -572,7 +572,7 @@ call, which renders as YAML `null` (not `""`) when the env var is
 unset — axa's `SmtpAuth` fields are `String`, not `Option<String>`, so
 this failed config parsing at boot with "invalid type: unit value,
 expected a string". This crate's `.gitignore` also excluded
-`config/production.yaml` entirely (a Loco scaffold default nobody had
+`config/production.yaml` entirely (a scaffold default nobody had
 removed), which is why the SMTP bug had never been caught — the file
 never left this machine, so no other checkout could exercise it. Both
 are fixed (the file is now tracked; see the `.gitignore` for the

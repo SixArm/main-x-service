@@ -205,8 +205,7 @@ impl App {
         Ok(())
     }
 
-    /// Register CLI tasks. None are registered; the inject marker is kept
-    /// so tasks can be added here later.
+    /// Register CLI tasks, run as `cargo run -- task <name>`.
     #[allow(unused_variables)]
     pub fn register_tasks(tasks: &mut Tasks) {
         tasks.register(crate::tasks::search::SearchReindex);

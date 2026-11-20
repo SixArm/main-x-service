@@ -12,17 +12,17 @@
 //!
 //! ```text
 //! # generate a fresh 32-byte key (hex on stdout, nothing else)
-//! cargo axa task integrity_key
-//! cargo axa task integrity_key op:generate
+//! cargo run -- task integrity_key
+//! cargo run -- task integrity_key op:generate
 //!
 //! # write it straight to a file for a secret mount, mode 0600
-//! cargo axa task integrity_key op:generate out:/run/secrets/mac.key
+//! cargo run -- task integrity_key op:generate out:/run/secrets/mac.key
 //!
 //! # check a candidate key without deploying it
-//! cargo axa task integrity_key op:check key:9f86d081884c7d65…
+//! cargo run -- task integrity_key op:check key:9f86d081884c7d65…
 //!
 //! # report what this process currently has loaded (never the key itself)
-//! cargo axa task integrity_key op:status
+//! cargo run -- task integrity_key op:status
 //! ```
 //!
 //! ## Why the key is printed and never logged

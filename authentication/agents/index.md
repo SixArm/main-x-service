@@ -42,7 +42,7 @@ The shared reference docs live at the project root under
 |----------|-------------|
 | [overview.md](../../agents/share/overview.md) | High-level project overview |
 | [architecture.md](../../agents/share/architecture.md) | Layered architecture |
-| [loco.md](../../agents/share/axa.md) | axa framework conventions |
+| [axa.md](../../agents/share/axa.md) | axa framework conventions |
 | [rust-axum-stack.md](../../agents/share/rust-axum-stack.md) | Full dependency inventory |
 | [availability.md](../../agents/share/availability.md) | Health checks, scaling |
 | [auditability.md](../../agents/share/auditability.md) | Audit logging and event streaming |

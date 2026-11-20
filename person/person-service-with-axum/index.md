@@ -825,7 +825,7 @@ Built with excellent Rust crates:
 - [Tokio](https://tokio.rs/) - Async runtime
 - [Axum](https://github.com/tokio-rs/axum) - Web framework
 - [sqlx](https://github.com/launchbadge/sqlx) - Async PostgreSQL driver with compile-time-checked queries
-- [Loco](https://axa/) - Web framework conventions (backend-only)
+- [axa](https://github.com/publicprojects-io/axa) - Web framework conventions (backend-only)
 - [OpenTelemetry](https://opentelemetry.io/) - Observability framework
 - [Tantivy](https://github.com/tantivy-search/tantivy) - Search engine
 - [Serde](https://serde.rs/) - Serialization

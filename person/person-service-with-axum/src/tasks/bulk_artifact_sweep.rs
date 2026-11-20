@@ -13,12 +13,12 @@
 //!
 //! ```text
 //! # report how many jobs qualify, without deleting anything
-//! cargo axa task bulk_artifact_sweep
-//! cargo axa task bulk_artifact_sweep op:report
+//! cargo run -- task bulk_artifact_sweep
+//! cargo run -- task bulk_artifact_sweep op:report
 //!
 //! # actually sweep (up to the row cap for this pass)
-//! cargo axa task bulk_artifact_sweep op:apply
-//! cargo axa task bulk_artifact_sweep op:apply limit:500
+//! cargo run -- task bulk_artifact_sweep op:apply
+//! cargo run -- task bulk_artifact_sweep op:apply limit:500
 //! ```
 //!
 //! ## Scheduling
@@ -32,7 +32,7 @@
 //! already uses for other operator-triggered maintenance
 //! ([`crate::tasks::integrity_resign`]) — meant to be invoked by an
 //! external scheduler (cron, a Kubernetes `CronJob`, a Podman `systemd`
-//! timer unit, …) running `cargo axa task bulk_artifact_sweep
+//! timer unit, …) running `cargo run -- task bulk_artifact_sweep
 //! op:apply` on whatever cadence a deployment's retention policy wants
 //! (daily is more than sufficient against the 7-day
 //! [`crate::bulk::BULK_ARTIFACT_TTL_SECS`] window).

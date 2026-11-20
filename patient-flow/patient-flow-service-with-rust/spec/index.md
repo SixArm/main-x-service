@@ -11,7 +11,7 @@ adds its spec detail here in the same PR as the code.
 ## Stack
 
 Per [architecture](../../spec/architecture.md) and the family
-[rust-loco-stack](../../../agents/share/rust-axum-stack.md):
+[rust-axum-stack](../../../agents/share/rust-axum-stack.md):
 Rust 2024, axa (Axum + sqlx), PostgreSQL 18, plain-SQL crate-root
 `migrations/`, controller-style `src/controllers/` layout, pure
 `src/flow/` core, stub-first upstream clients, offline PASETO +

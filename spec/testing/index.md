@@ -390,7 +390,7 @@ persistence — while local `cargo test` without that container stays
 green DB-free. The clippy and fmt jobs need no services and run on every
 push regardless.
 
-> Some older non-loco crates historically split this across
+> Some older crates historically split this across
 > `test.yml` / `quality.yml` / `security.yml` (unit + doc tests, then a
 > separate PostgreSQL-backed integration job); the consolidated
 > three-job `ci.yaml` above is the current convention. The contract is

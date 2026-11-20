@@ -85,5 +85,5 @@ code lands without the spec describing it.
 - [UK NHS Number — Wikipedia](https://en.wikipedia.org/wiki/NHS_number)
 - [NHS Synthetic Data Service](https://digital.nhs.uk/services/synthetic-data)
 - [GOV.UK Design System](https://design-system.service.gov.uk/)
-- [Loco](https://axa) · [SvelteKit](https://svelte.dev/docs/kit)
+- [axa](https://github.com/publicprojects-io/axa) · [SvelteKit](https://svelte.dev/docs/kit)
 - The five upstream Main-X-Services live under `~/git/sixarm/main-x-service/`.

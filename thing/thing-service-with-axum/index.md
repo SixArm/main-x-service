@@ -175,7 +175,7 @@ Configuration is loaded from `config/{development,test,production}.yaml`
 > `DATABASE_MAX_CONNECTIONS`, `DATABASE_MIN_CONNECTIONS`, `SERVER_HOST`,
 > and `SERVER_PORT` also parse into this crate's legacy
 > `src/config/mod.rs::Config` struct but are **not read anywhere else in
-> `src/`** — a pre-loco holdover. There is no gRPC server
+> `src/`** — an older holdover. There is no gRPC server
 > ([T-3](spec/13-tasks.md) is still open); the real REST bind
 > address/port and DB pool size come from axa's own configuration. The
 > `OTLP_*` variables parse there too, but export reads them through

@@ -98,7 +98,7 @@ side-effects. The end-to-end operation is:
 3. **Update main** with the merged payload.
 4. **Soft-delete the duplicate** (set `deleted_at`; the row is retained).
 5. **Link** main → duplicate with a `Replaces` link (and, in MPI
-   lineage, `ReplacedBy` on the duplicate). _Loco lineage records the
+   lineage, `ReplacedBy` on the duplicate). _Controller-style services record the
    `Replaces` relationship implicitly via the `merge_records` row
    (`main_pid` → `duplicate_pid`); MPI lineage writes an explicit
    `PersonLink`._

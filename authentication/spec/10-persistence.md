@@ -36,10 +36,10 @@ plus `…04_users_deleted_at` and `…06_users_attributes`):
 | `pid` | uuid | Public id; the token `sub` |
 | `email` | varchar, unique | Sign-in identity; personal data (§12); a tombstone after erasure |
 | `password` | varchar | Unusable random hash — no password flow |
-| `api_key` | varchar, unique | loco-starter convention (`lo-{uuid}`) |
+| `api_key` | varchar, unique | legacy scaffold convention (`lo-{uuid}`) |
 | `name` | varchar | Display name; `deleted user` after erasure |
-| `reset_token` / `reset_sent_at` | nullable | Legacy loco-starter (unused) |
-| `email_verification_token` / `email_verification_sent_at` | nullable | Legacy loco-starter (unused) |
+| `reset_token` / `reset_sent_at` | nullable | Legacy scaffold (unused) |
+| `email_verification_token` / `email_verification_sent_at` | nullable | Legacy scaffold (unused) |
 | `email_verified_at` | timestamptz, nullable | Set on first redemption |
 | `magic_link_token` | varchar, nullable | SHA-256 hex of the live link token, never the token (SEC-A9, `…09_hash_credentials_at_rest`) |
 | `magic_link_expiration` | timestamptz, nullable | Now + 5 min |

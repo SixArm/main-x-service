@@ -45,10 +45,8 @@ deprecated for authorization.
 > mints Ed25519 PASETO v4.public tokens and publishes its key set at
 > `/.well-known/paseto-keys`; no JWT is issued anywhere.
 
-It is also the family's **reference axa application**: the existing
-service crates only *declare* `axa` but actually run hand-rolled
-Axum. They will be converted to real Loco using this crate as the
-template (see root `AGENTS.md`).
+It is also the family's **reference axa application**: the shape the
+other service crates follow (see root `AGENTS.md`).
 
 **Enterprise identity federation (EV-2, opt-in).** Behind the `oidc`
 Cargo feature (off by default — a build without it pulls in no extra
@@ -266,7 +264,7 @@ as YAML `null` (not `""`) when the env var is unset — axa's
 `SmtpAuth` fields are `String`, not `Option<String>`, so this failed
 config parsing at boot with "invalid type: unit value, expected a
 string". This crate's `.gitignore` also excluded
-`config/production.yaml` entirely (a Loco scaffold default nobody had
+`config/production.yaml` entirely (a scaffold default nobody had
 removed), which is why the bug had never been caught — the file never
 left this machine, so no other checkout could exercise it. Both are
 fixed (the file is now tracked; see the `.gitignore` for the

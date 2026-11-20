@@ -54,10 +54,7 @@ test-db: mxi-case-test-db ready
   DB_URL=postgres://postgres:postgres@localhost:5434/case_service_test
 ```
 
-Migrate both (same `cargo run -- db migrate` pattern TUT-2 established —
-`cargo run -- db migrate` still doesn't work in this environment: no
-`cargo-loco` shim is installed here, only the standalone `loco`
-generator CLI, confirmed again for this tutorial):
+Migrate both (the same `cargo run -- db migrate` pattern TUT-2 uses):
 
 ```sh
 cd authentication/authentication-service-with-axum

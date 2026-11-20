@@ -219,8 +219,7 @@ impl App {
         Ok(())
     }
 
-    /// Register CLI tasks — none for the MVP (the inject marker is kept so
-    /// `cargo axa generate task` can splice new tasks in).
+    /// Register CLI tasks, run as `cargo run -- task <name>`.
     #[allow(unused_variables)]
     pub fn register_tasks(tasks: &mut Tasks) {
         tasks.register(crate::tasks::search::SearchReindex);

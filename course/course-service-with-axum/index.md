@@ -198,7 +198,7 @@ from the environment via `Config::from_env`:
 | `OTLP_ENDPOINT` | OTLP collector endpoint; unset means export is off | (off) |
 | `OTLP_ALLOW_INSECURE` | Allow plain `http` to a remote collector | off |
 
-**Parsed but not read anywhere else** (legacy pre-loco `Config` fields
+**Parsed but not read anywhere else** (legacy `Config` fields
 that nothing in `src/` consults — the real bind address/port come from
 axa's own `config/<environment>.yaml`, and there is no streaming-broker
 client in this crate): `GRPC_PORT` (no gRPC surface exists at all — not

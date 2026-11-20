@@ -264,7 +264,7 @@ magic-link issuance is separate and stays on.
 > ([jwt.md](jwt.md)). Every axa crate now takes
 > `default-features = false` without `auth`, and the one reference that
 > blocked it — `authentication-service`'s never-called
-> `Model::generate_jwt`, documented as loco-scaffold parity — was
+> `Model::generate_jwt`, documented as scaffold parity — was
 > deleted. `cargo deny check` is clean across the tree.
 >
 > Worth keeping in view: this is what a dependency-driven advisory looks

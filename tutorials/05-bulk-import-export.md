@@ -24,8 +24,7 @@ verification (against `single-service.yml`/case-service).
 
 **This tutorial does not reuse that compose fix directly**, though — it
 runs person-service **locally** via `cargo run -- start --server-and-worker`,
-the same way TUT-2 and TUT-3 found is what actually works in this
-environment (no `cargo-loco` shim installed). That flag is the exact one
+the same way TUT-2 and TUT-3 run their services. That flag is the exact one
 `COMPOSE-WORKER` added to the compose files; running it locally exercises
 the identical `StartMode::ServerAndWorker` code path axa's CLI parses
 into, just without a container in between. Local `cargo run` is also

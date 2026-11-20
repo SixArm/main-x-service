@@ -8,8 +8,8 @@
 //! schema change to the indexed field set.
 //!
 //! ```text
-//! cargo axa task search_reindex            # rebuild everything
-//! cargo axa task search_reindex batch:1000 # tune the page size
+//! cargo run -- task search_reindex            # rebuild everything
+//! cargo run -- task search_reindex batch:1000 # tune the page size
 //! ```
 
 use axa::prelude::*;

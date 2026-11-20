@@ -37,7 +37,7 @@ The persistent top navigation bar (every route; collapses behind a hamburger tog
 
 - Node.js 20+
 - `pnpm` (or `npm`)
-- A running Person Service — see [`../person-service-with-axum/README.md`](../person-service-with-axum/README.md). Dev default (`loco start`, and this app's own fallback): `http://localhost:5150`. The podman-compose container maps `:8080` instead — see "Configuration" below and the integration-test section.
+- A running Person Service — see [`../person-service-with-axum/README.md`](../person-service-with-axum/README.md). Dev default (`cargo run -- start`, and this app's own fallback): `http://localhost:5150`. The podman-compose container maps `:8080` instead — see "Configuration" below and the integration-test section.
 
 ## Quick start
 
