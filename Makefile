@@ -1,4 +1,4 @@
-.PHONY: github-pages ci ci-full test-minimum-supported-rust-version test-coverage hooks hooks-off
+.PHONY: github-pages ci ci-full ci-minimum-supported-rust-version test-benchmarks test-coverage hooks hooks-off
 
 # Push the docs site subdirectory out to the github-pages remote via
 # git's subtree mechanism. See spec/monorepo-github-pages/index.md.
@@ -16,9 +16,13 @@ ci-full:
 
 # Check and test every crate on Rust N-2 (the declared MSRV in ci/msrv.txt)
 # and N-1 (the next minor up). Needs both toolchains installed; see
-# bin/make-test-minimum-supported-rust-version. Pass CRATES="path/to/crate ..." to narrow it.
-test-minimum-supported-rust-version:
-	bin/make-test-minimum-supported-rust-version $(CRATES)
+# bin/make-ci-minimum-supported-rust-version. Pass CRATES="path/to/crate ..." to narrow it.
+ci-minimum-supported-rust-version:
+	bin/make-ci-minimum-supported-rust-version $(CRATES)
+
+# Run the criterion benchmarks (the same step ci-full runs).
+test-benchmarks:
+	scripts/ci-check.sh bench
 
 # Measure test coverage of the un-gated suite with cargo-tarpaulin, one
 # report per crate under target/tarpaulin/ (spec/testing §1.5). A report,

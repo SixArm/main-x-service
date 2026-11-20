@@ -10,5 +10,5 @@
 # crates) rather than letting `rustup` float.
 [toolchain]
 channel = "1.100.0"
-components = ["rustfmt", "clippy"]
+components = ["clippy", "llvm-tools", "rustfmt"]
 profile = "minimal"

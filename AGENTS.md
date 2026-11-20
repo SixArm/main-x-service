@@ -207,7 +207,7 @@ stable 1.100. It is declared per crate (`rust-version` in every
 from [`ci/msrv.txt`](ci/msrv.txt), and enforced by the `msrv` stage. The
 `rust-toolchain.toml` pin (1.100.0, what we build, format and lint with) is
 deliberately ahead of the MSRV; they are distinct numbers with distinct jobs
-(§3 of the policy doc). `make test-minimum-supported-rust-version` checks and
+(§3 of the policy doc). `make ci-minimum-supported-rust-version` checks and
 tests both N-2 and N-1. The binding constraint is still
 the dependency graph, not our code: axa 0.11 requires 1.97 (sqlx 0.9
 requires 1.94), so the MSRV sits one release above the floor, and an axa

@@ -14,7 +14,7 @@ stable compiler is `1.N`, the MSRV is `1.(N-2)`.
 The build pin (since 2026-11-17, 1.100.0) is deliberately ahead of the MSRV: it
 is the current stable we format and lint with, while the MSRV is the oldest
 compiler we promise still works. They are two numbers with two different jobs
-(§3). `make test-minimum-supported-rust-version` proves both N-2 and N-1.
+(§3). `make ci-minimum-supported-rust-version` proves both N-2 and N-1.
 The two once coincided, a property of that moment's specific
 numbers, not something the policy guarantees going forward — the next
 stable release moves the MSRV but not the pin, and they will drift
