@@ -8882,3 +8882,78 @@ Kept as they were by worker's SQ-1, then fixed (crate spec §13).
   screening view showing reach, positive share and the T-15d run
   chart, with the design label always visible. Depends: T-15b, T-15c,
   T-15d.
+
+## Phase 15 — NHS Wales supplier assurance (2026-11-20)
+
+> **Provenance.** A procurement brief for supplying, UK-hosting and
+> supporting this family as a managed HR service for NHS Wales, with
+> the supplier as UK GDPR processor. The requirements (NWS-G/H/A) and
+> their status against the code are in
+> [`spec/nhs-wales-supplier-assurance`](spec/nhs-wales-supplier-assurance/index.md),
+> the single source of truth for them. These are the gaps that need
+> code or repository documents; the organisational items (DPA, WIGTK,
+> Cyber Essentials Plus, ISO 27001, vetting, incident plan) are not
+> tasks here.
+
+- [ ] **NW-1 (S)** authentication-service: a setting that turns
+  magic-link sign-in **off**, so an instance federated to Entra ID
+  accepts no local login. Refuse to boot with it off and no IdP
+  configured, which would lock everyone out. NWS-A3.
+- [ ] **NW-2 (M)** authentication-service OIDC: optionally require that
+  the ID token shows MFA (`amr` and/or `acr`, values configurable,
+  since Entra ID reports them its own way) and refuse and audit a
+  sign-in that does not. Verify against a real Entra ID tenant, not
+  only the stub IdP. NWS-A3.
+- [ ] **NW-3 (L)** ABAC field groups: let an allow rule's obligation
+  name field groups to hide (e.g. `mask:assessments`), alongside the
+  existing all-or-nothing `mask`. Verifier engine first, then worker,
+  then person. Every field belongs to exactly one group, and a field
+  with none is hidden under any field-group obligation (fail-closed).
+  This is what the line-manager / HR / payroll split needs. NWS-A4.
+- [ ] **NW-4 (M)** Time-bound admin: an expiry on an attribute
+  assignment (e.g. `access=admin` for 2 hours), with an approver and a
+  reason recorded on the `attributes_assigned` audit row, and the
+  sessions revoked at expiry as they already are on change. NWS-H3.
+- [ ] **NW-5 (L)** Column-level encryption for special-category fields,
+  starting with worker assessments: AEAD under a per-deployment data
+  key held outside the database, so a dump or SQL access does not read
+  them and destroying the key is a cryptographic erasure. Decide first
+  how matching and search treat an encrypted field. NWS-A5, NWS-A9.
+- [ ] **NW-6 (S)** worker and person: adopt care-pathway's residency
+  declaration (`<P>_DATA_RESIDENCY`, `GET /api/compliance`, a
+  transfer audit event on export). Also correct the stale "not yet
+  adopted" list in each `src/compliance/mod.rs`, which still names
+  erasure and record integrity, both of which have landed. NWS-H1.
+- [ ] **NW-7 (M)** SIEM export of the audit trail: push audit rows
+  (worker, person, authentication `auth_events`) to a customer
+  endpoint, at least once, carrying each row's chain hash so the SIEM
+  copy can be checked against `/api/audit/verify`. Choose between
+  syslog/CEF and OTLP logs. NWS-A6.
+- [ ] **NW-8 (S)** CI: scan built container images (the Debian base
+  layer is invisible to `cargo-deny`), failing on Critical. NWS-A2.
+- [ ] **NW-9 (S)** Write the patch SLA (severity → days) and record
+  time-to-patch for each advisory, starting with the two `deny`
+  failures open on 2026-11-20 (RUSTSEC-2026-0543 `chrono` unmaintained,
+  RUSTSEC-2026-0555 in event-service). NWS-A2.
+- [ ] **NW-10 (S)** CI: licence-check front-end npm dependencies,
+  including the Lily packages, against the same allow-list as
+  `deny.toml`. NWS-G5.
+- [ ] **NW-11 (S)** Deployment template for the assurance pack: the
+  sub-processor register (from the spec's §2.1) and a UK data-flow /
+  tenant-isolation diagram, to be filled in per deployment. NWS-G4.
+- [ ] **NW-12 (S)** Penetration-test brief: the role matrix to attack
+  (employee, line manager, HR, occupational health, payroll, supplier
+  support admin, machine peer), the ABAC policy under test, and the
+  §6 settings the test instance must carry. NWS-A1.
+- [ ] **NW-13 (M)** Retention and purge: controller-configured rules
+  that purge records (by age and status) and audit rows past their
+  retention, keeping the audit chain verifiable the way Art. 17
+  erasure already does. NWS-A8, NWS-A6.
+- [ ] **NW-14 (M)** worker bulk export (JSONL + CSV), following the
+  [bulk contract](agents/share/bulk-import-export.md) and person's
+  streaming reference, masked and audited like single reads, for the
+  whole-workforce exit export. NWS-A9.
+- [ ] **NW-15 (S)** A conformance check for an NHS Wales instance: on
+  boot (or as a CLI task), report every spec §6 setting that is at its
+  permissive default, so a missing one is visible instead of silent.
+  Depends: NW-1, NW-6.

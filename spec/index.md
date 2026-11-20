@@ -77,6 +77,7 @@ the family-wide source of truth; the briefer versions under
 | [locales](locales/index.md) | i18n/l10n — the authentication email/UI catalog pattern, supported languages, BCP-47, RTL |
 | [testing](testing/index.md) | Testing strategy — un-gated unit, DB-gated request, bridge tests, front-end vitest/Playwright, CI |
 | [compliance](compliance/index.md) | Regulatory compliance — target regimes, obligation→control map, data-sensitivity, ISO 42001, gaps |
+| [nhs-wales-supplier-assurance](nhs-wales-supplier-assurance/index.md) | Supplying and UK-hosting the family as a managed HR service for NHS Wales — processor obligations, requirement-by-requirement status, shared responsibility, required deployment settings, assurance pack |
 
 ### Pointers
 
