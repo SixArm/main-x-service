@@ -1166,6 +1166,31 @@ mod tests {
         );
     }
 
+    /// `$email` resolves to the caller's email, as `$sub` does to the pid.
+    #[test]
+    fn value_template_email_matches_the_caller() {
+        let policy = Policy::from_json(
+            r#"{ "rules": [
+                { "effect": "allow", "actions": ["write"],
+                  "when": { "resource.owner_email": ["$email"] } }
+            ] }"#,
+        )
+        .expect("policy parses");
+        let caller = claims_with_attrs(&[]);
+        let mine = resource(&[("owner_email", &[caller.email.as_str()])]);
+        let theirs = resource(&[("owner_email", &["someone@else.example"])]);
+        assert!(
+            policy
+                .evaluate_with_resource(&caller, Action::Write, "case", &mine)
+                .allowed
+        );
+        assert!(
+            !policy
+                .evaluate_with_resource(&caller, Action::Write, "case", &theirs)
+                .allowed
+        );
+    }
+
     #[test]
     fn literal_dollar_value_is_not_a_template() {
         // Only exactly `$sub` / `$email` are templates; any other value

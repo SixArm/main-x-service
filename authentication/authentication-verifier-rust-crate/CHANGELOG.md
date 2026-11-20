@@ -10,6 +10,19 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — the key-set fetch's SEC-V1 guards are tested
+
+- `from_paseto_keys_url` was tested only for refusing a non-`https` URL;
+  the guards on the response itself were not. A one-shot loopback server
+  now drives each: a key set loads and verifies; a redirect is refused and
+  its target never contacted; an error status, a body over 64 KiB, and a
+  body that is not JSON are each a `Fetch` error. Allowing redirects or
+  raising the cap fails the matching test.
+- Tests for the `$email` template, a key with no `x`, a token with no
+  footer, Keycloak claim fallbacks, an unreadable role-map file, an
+  unparseable Keycloak URL, and a `Debug` that shows no role map.
+  Lines with all features 95.95% → 98.62%.
+
 ## [0.9.4] - 2026-11-17
 
 ### Fixed

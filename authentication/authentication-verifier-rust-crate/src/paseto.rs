@@ -702,6 +702,30 @@ mod tests {
         ));
     }
 
+    /// A published key with no `x` is a key-set error naming the kid.
+    #[test]
+    fn key_without_x_is_a_key_set_error() {
+        let mut keys = test_keys();
+        keys["keys"][0].as_object_mut().unwrap().remove("x");
+        match Verifier::from_paseto_keys_value(&keys, ISSUER, AUDIENCE) {
+            Err(VerifyError::Keys(msg)) => assert!(msg.contains("missing \"x\""), "{msg}"),
+            Err(other) => panic!("expected a key-set error, got {other:?}"),
+            Ok(_) => panic!("a key without x must not load"),
+        }
+    }
+
+    /// A token with no footer carries no kid, so it cannot select a key.
+    #[test]
+    fn token_without_footer_is_missing_kid() {
+        let verifier = Verifier::from_paseto_keys_value(&test_keys(), ISSUER, AUDIENCE).unwrap();
+        let token = sign(KID, &claims(3600));
+        let no_footer = token.rsplit_once('.').expect("has a footer").0.to_string();
+        assert!(matches!(
+            verifier.verify(&no_footer),
+            Err(VerifyError::MissingKid)
+        ));
+    }
+
     #[test]
     fn unknown_kid_is_rejected() {
         let verifier = Verifier::from_paseto_keys_value(&test_keys(), ISSUER, AUDIENCE).unwrap();
@@ -935,6 +959,123 @@ mod tests {
             // The contract: an `Err`, and above all no panic / no unwind.
             let _ = verifier.verify(&c);
         }
+    }
+
+    /// A one-shot HTTP server on loopback (which the scheme check allows):
+    /// it answers the first request with `response` and records whether it
+    /// was contacted at all.
+    #[cfg(feature = "fetch")]
+    async fn serve_once(
+        response: Vec<u8>,
+    ) -> (String, std::sync::Arc<std::sync::atomic::AtomicBool>) {
+        use std::sync::atomic::{AtomicBool, Ordering};
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("bind loopback");
+        let url = format!(
+            "http://{}/.well-known/paseto-keys",
+            listener.local_addr().unwrap()
+        );
+        let contacted = std::sync::Arc::new(AtomicBool::new(false));
+        let flag = contacted.clone();
+        tokio::spawn(async move {
+            if let Ok((mut socket, _)) = listener.accept().await {
+                flag.store(true, Ordering::SeqCst);
+                let mut request = Vec::new();
+                let mut buf = [0u8; 1024];
+                while !request.windows(4).any(|w| w == b"\r\n\r\n") {
+                    match socket.read(&mut buf).await {
+                        Ok(0) | Err(_) => break,
+                        Ok(n) => request.extend_from_slice(&buf[..n]),
+                    }
+                }
+                let _ = socket.write_all(&response).await;
+                let _ = socket.shutdown().await;
+            }
+        });
+        (url, contacted)
+    }
+
+    #[cfg(feature = "fetch")]
+    fn http_response(status: &str, extra_headers: &str, body: &[u8]) -> Vec<u8> {
+        let mut out = format!(
+            "HTTP/1.1 {status}\r\ncontent-type: application/json\r\ncontent-length: {}\r\nconnection: close\r\n{extra_headers}\r\n",
+            body.len()
+        )
+        .into_bytes();
+        out.extend_from_slice(body);
+        out
+    }
+
+    /// The happy path: a published key set over loopback loads, and a token
+    /// signed with that key verifies.
+    #[cfg(feature = "fetch")]
+    #[tokio::test]
+    async fn fetched_key_set_loads_and_verifies() {
+        let body = serde_json::to_vec(&test_keys()).unwrap();
+        let (url, _) = serve_once(http_response("200 OK", "", &body)).await;
+        let verifier = Verifier::from_paseto_keys_url(&url, ISSUER, AUDIENCE)
+            .await
+            .expect("key set loads");
+        assert!(verifier.verify(&sign(KID, &claims(3600))).is_ok());
+    }
+
+    /// SEC-V1: a redirect is not followed, so an `https` URL cannot be
+    /// bounced to an attacker's key set. The target is never contacted.
+    #[cfg(feature = "fetch")]
+    #[tokio::test]
+    async fn fetch_does_not_follow_a_redirect() {
+        let body = serde_json::to_vec(&test_keys()).unwrap();
+        let (target, target_contacted) = serve_once(http_response("200 OK", "", &body)).await;
+        let (url, _) = serve_once(http_response(
+            "302 Found",
+            &format!("location: {target}\r\n"),
+            b"",
+        ))
+        .await;
+        let r = Verifier::from_paseto_keys_url(&url, ISSUER, AUDIENCE).await;
+        assert!(
+            matches!(r, Err(VerifyError::Fetch(_))),
+            "a redirect must not yield a verifier"
+        );
+        assert!(
+            !target_contacted.load(std::sync::atomic::Ordering::SeqCst),
+            "the redirect target must never be fetched"
+        );
+    }
+
+    /// An error status is refused, not parsed.
+    #[cfg(feature = "fetch")]
+    #[tokio::test]
+    async fn fetch_refuses_an_error_status() {
+        let body = serde_json::to_vec(&test_keys()).unwrap();
+        let (url, _) = serve_once(http_response("500 Internal Server Error", "", &body)).await;
+        let r = Verifier::from_paseto_keys_url(&url, ISSUER, AUDIENCE).await;
+        assert!(matches!(r, Err(VerifyError::Fetch(_))));
+    }
+
+    /// SEC-V1: a body over 64 KiB is refused before it is parsed, so a
+    /// hostile endpoint cannot make the peer buffer without bound.
+    #[cfg(feature = "fetch")]
+    #[tokio::test]
+    async fn fetch_refuses_an_oversized_key_set() {
+        let body = vec![b' '; 64 * 1024 + 1];
+        let (url, _) = serve_once(http_response("200 OK", "", &body)).await;
+        match Verifier::from_paseto_keys_url(&url, ISSUER, AUDIENCE).await {
+            Err(VerifyError::Fetch(msg)) => assert!(msg.contains("limit"), "{msg}"),
+            Err(other) => panic!("expected the size limit, got {other:?}"),
+            Ok(_) => panic!("an oversized key set must be refused"),
+        }
+    }
+
+    /// A body that is not JSON is a fetch error, not a panic.
+    #[cfg(feature = "fetch")]
+    #[tokio::test]
+    async fn fetch_refuses_a_body_that_is_not_json() {
+        let (url, _) = serve_once(http_response("200 OK", "", b"<html>nope</html>")).await;
+        let r = Verifier::from_paseto_keys_url(&url, ISSUER, AUDIENCE).await;
+        assert!(matches!(r, Err(VerifyError::Fetch(_))));
     }
 
     /// SEC-V1: the `fetch` path refuses a non-`https` key-set URL outright

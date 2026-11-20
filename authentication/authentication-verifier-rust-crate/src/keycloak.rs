@@ -597,4 +597,60 @@ mod tests {
         );
         assert!(s.validate().is_err(), "uppercase attribute key");
     }
+
+    /// When the token omits them, the display name falls back to
+    /// `preferred_username`, the session id to the token id, and the
+    /// audience to the first configured one.
+    #[test]
+    fn missing_optional_claims_fall_back() {
+        let mut t = token(vec![]);
+        t.extra.name = None;
+        t.extra.sid = None;
+        t.audience = vec!["account".into()];
+        let claims = claims_from_token(&t, &settings()).expect("valid");
+        assert_eq!(claims.name, "ada");
+        assert_eq!(claims.sid, "jti-1");
+        assert_eq!(claims.aud, "mxi-api");
+        t.extra.preferred_username = None;
+        assert_eq!(claims_from_token(&t, &settings()).unwrap().name, "");
+    }
+
+    /// A role-map file that cannot be read is an error naming the file, not
+    /// a silently empty map that would grant nothing without saying so.
+    #[test]
+    fn unreadable_role_map_file_is_an_error() {
+        let r = settings_from_lookup(
+            "ORG",
+            &env(&[
+                ("ORG_KEYCLOAK_URL", "https://kc.example.com/"),
+                ("ORG_KEYCLOAK_REALM", "mxi"),
+                ("ORG_KEYCLOAK_AUDIENCES", "mxi-api"),
+                ("ORG_KEYCLOAK_ROLE_MAP_FILE", "/nonexistent/role-map.json"),
+            ]),
+        );
+        match r {
+            Err(VerifyError::Keycloak(msg)) => assert!(msg.contains("ROLE_MAP_FILE"), "{msg}"),
+            other => panic!("expected a role-map error, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn an_unparseable_url_is_refused() {
+        let mut s = settings();
+        s.url = "not a url".into();
+        assert!(matches!(s.validate(), Err(VerifyError::Keycloak(_))));
+    }
+
+    /// `Debug` names the issuer and audiences, and nothing from the role map.
+    #[tokio::test]
+    async fn debug_shows_issuer_not_role_map() {
+        let v = KeycloakVerifier::new(settings()).expect("valid settings");
+        let shown = format!("{v:?}");
+        assert!(
+            shown.contains("https://kc.example.com/realms/mxi"),
+            "{shown}"
+        );
+        assert!(shown.contains("mxi-api"), "{shown}");
+        assert!(!shown.contains("editor"), "role map leaked: {shown}");
+    }
 }
