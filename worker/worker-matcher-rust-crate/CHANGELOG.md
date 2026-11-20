@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — tests for every score component and the identifier tables
+
+- Ported from person-matcher: `every_component_counts_at_its_own_weight`
+  (each component, alone at 1.0 against a 0.0 given name, scores exactly
+  `w / (w + w_given_name)`), the *Codice Fiscale* table checks, and each
+  national-identifier parser's format rejections.
+
 ### Added — the demo binary is tested
 
 - `tests/demo.rs` runs the demo and checks each example shows what its

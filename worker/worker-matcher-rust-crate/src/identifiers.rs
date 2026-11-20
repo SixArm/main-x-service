@@ -3670,4 +3670,117 @@ mod tests {
         assert_eq!(parse_sk_passport("ABC123456"), None);
         assert_eq!(parse_sk_passport("AB12345"), None);
     }
+
+    /// The *Codice Fiscale* even-position table is "digit value, or letter
+    /// index" (`A`=0 … `Z`=25), so it is checked against that rule rather
+    /// than against a second hand-typed table.
+    #[test]
+    fn cf_even_table_is_digit_value_or_letter_index() {
+        for c in '0'..='9' {
+            assert_eq!(cf_even_value(c), c.to_digit(10), "{c}");
+        }
+        for (i, c) in ('A'..='Z').enumerate() {
+            assert_eq!(cf_even_value(c), u32::try_from(i).ok(), "{c}");
+        }
+        for bad in ['a', '-', ' ', 'Ñ'] {
+            assert_eq!(cf_even_value(bad), None, "{bad:?}");
+        }
+    }
+
+    /// The odd-position table, as published by the Agenzia delle Entrate.
+    /// Digits share the value of the letter in the same position (`0`↔`A`).
+    #[test]
+    fn cf_odd_table_matches_the_published_table() {
+        const PUBLISHED: [u32; 26] = [
+            1, 0, 5, 7, 9, 13, 15, 17, 19, 21, 2, 4, 18, 20, 11, 3, 6, 8, 12, 14, 16, 10, 22, 25,
+            24, 23,
+        ];
+        for (c, want) in ('A'..='Z').zip(PUBLISHED) {
+            assert_eq!(cf_odd_value(c), Some(want), "{c}");
+        }
+        for (d, c) in ('0'..='9').zip('A'..='J') {
+            assert_eq!(cf_odd_value(d), cf_odd_value(c), "{d} must equal {c}");
+        }
+        for bad in ['a', '-', ' '] {
+            assert_eq!(cf_odd_value(bad), None, "{bad:?}");
+        }
+    }
+
+    /// Each parser refuses a value with a character of the wrong class in
+    /// each position it checks, or the wrong length, before any checksum.
+    /// Every input is a one-character edit of that parser's valid example.
+    /// A parser under test: `(why, parser, input)`.
+    type Case = (&'static str, fn(&str) -> Option<String>, &'static str);
+
+    #[test]
+    fn malformed_values_are_refused_before_the_checksum() {
+        let refused: &[Case] = &[
+            ("fr_nir key not digits", parse_fr_nir, "1801275123456AB"),
+            ("es_dni nothing left", parse_es_dni, "-"),
+            ("es_dni no check letter", parse_es_dni, "123456789"),
+            ("es_dni unknown prefix", parse_es_dni, "A1234567L"),
+            ("fi_hetu date not digits", parse_fi_hetu, "15018A-999B"),
+            ("fi_hetu serial not digits", parse_fi_hetu, "150180-99AB"),
+            ("fi_hetu unknown century sign", parse_fi_hetu, "150180Q999B"),
+            ("lt_ak ten digits", parse_lt_ak, "4800115001"),
+            ("mt_id body not digits", parse_mt_id, "123456AM"),
+            ("no_fnr ten digits", parse_no_fnr, "1501801239"),
+            ("si_emso twelve digits", parse_si_emso, "150198050001"),
+            ("uk_nino prefix not letters", parse_uk_nino, "1B123456A"),
+            ("uk_nino body not digits", parse_uk_nino, "AB12C456A"),
+            ("li_id body not digits", parse_li_id, "ID1234A678"),
+            ("cn_rrn body not digits", parse_cn_rrn, "11010519491231A02X"),
+            (
+                "mx_curp name not letters",
+                parse_mx_curp,
+                "H3GG560427MVZRRL04",
+            ),
+            (
+                "mx_curp date not digits",
+                parse_mx_curp,
+                "HEGG5604A7MVZRRL04",
+            ),
+            (
+                "mx_curp consonants not letters",
+                parse_mx_curp,
+                "HEGG560427MVZ1RL04",
+            ),
+            (
+                "mx_curp homoclave not alphanumeric",
+                parse_mx_curp,
+                "HEGG560427MVZRRL-4",
+            ),
+            (
+                "mx_curp check not digit",
+                parse_mx_curp,
+                "HEGG560427MVZRRL0A",
+            ),
+            ("nz_nhi body not digits", parse_nz_nhi, "ZAA00A3"),
+            ("li_passport five chars", parse_li_passport, "R0053"),
+            ("pt_passport six chars", parse_pt_passport, "A12345"),
+            ("ro_passport seven chars", parse_ro_passport, "AB12345"),
+            (
+                "sk_passport prefix not letters",
+                parse_sk_passport,
+                "A11234567",
+            ),
+        ];
+        for (why, parse, input) in refused {
+            assert_eq!(parse(input), None, "{why}: {input:?}");
+        }
+    }
+
+    /// The NIE prefixes stand for leading digits (`X`=0, `Y`=1, `Z`=2)
+    /// before the mod-23 letter is checked.
+    #[test]
+    fn es_nie_prefixes_map_to_leading_digits() {
+        assert_eq!(parse_es_dni("X1234567L").as_deref(), Some("X1234567L"));
+        assert_eq!(parse_es_dni("Y1234567X").as_deref(), Some("Y1234567X"));
+        assert_eq!(parse_es_dni("Z1234567R").as_deref(), Some("Z1234567R"));
+        assert_eq!(
+            parse_es_dni("Y1234567L"),
+            None,
+            "the letter is checked after the remap"
+        );
+    }
 }
