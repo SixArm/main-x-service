@@ -10,6 +10,14 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — request tests for the session → PASETO exchange
+
+- `POST /api/auth/token` had no request test; only its CSRF decision was
+  unit-tested. `tests/requests/token.rs` drives the handler: a session
+  with its CSRF token gets a PASETO for its own user, bound to that
+  session; no cookie, an unknown session and a revoked session are `401`;
+  a missing, forged, or swapped CSRF token is `403` (SEC-A10).
+
 ### Added — turn magic-link sign-in off (NW-1)
 
 - `AUTH_MAGIC_LINK_ENABLED=false` unmounts `POST /api/auth/signup` and

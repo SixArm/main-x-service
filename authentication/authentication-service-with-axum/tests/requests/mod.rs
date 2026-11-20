@@ -14,3 +14,5 @@ mod oidc;
 #[cfg(feature = "paseto")]
 mod prepare_data;
 mod rate_limit;
+#[cfg(feature = "paseto")]
+mod token;
