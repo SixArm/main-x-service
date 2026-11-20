@@ -855,6 +855,10 @@ fn parse_time_and_offset(rest: &str) -> Option<(u32, u32, u32, i64)> {
             } else {
                 0
             };
+            // RFC 3339 `time-numoffset`: hour 00-23, minute 00-59.
+            if !(0..=23).contains(&oh) || !(0..=59).contains(&om) {
+                return None;
+            }
             sign * (oh * 3600 + om * 60)
         }
         Some(_) => return None,
@@ -2162,5 +2166,77 @@ mod tests {
             Normalizer::normalize_phone_e164("+44 0 7700 900123", None),
             Some("+447700900123".to_string()),
         );
+    }
+
+    /// Accepted shapes (spec §4.7). Expected values were computed with
+    /// Python's `datetime`, not with this parser.
+    #[test]
+    fn iso8601_accepted_shapes() {
+        let cases: &[(&str, i64)] = &[
+            ("2024-02-29", 1_709_164_800),
+            ("2000-02-29T12:30:00Z", 951_827_400),
+            ("2000-02-29t12:30:00z", 951_827_400),
+            ("2000-02-29 12:30:00Z", 951_827_400),
+            ("2000-02-29T12:30Z", 951_827_400),
+            ("2000-02-29T12:30:00.999Z", 951_827_400),
+            ("1969-12-31T23:59:59Z", -1),
+            ("2024-06-26T09:00:00+05:30", 1_719_372_600),
+            ("2024-06-26T09:00:00+0530", 1_719_372_600),
+            ("2024-06-26T09:00:00-08:00", 1_719_421_200),
+            ("2024-06-26T09:00:00-08", 1_719_421_200),
+            ("1900-03-01", -2_203_891_200),
+            ("1600-01-01", -11_676_096_000),
+            ("  2024-02-29  ", 1_709_164_800),
+        ];
+        for (input, want) in cases {
+            assert_eq!(
+                Normalizer::parse_iso8601_unix_seconds(input),
+                Some(*want),
+                "{input:?}"
+            );
+        }
+    }
+
+    /// Every malformed or out-of-range component is refused (spec §4.7).
+    #[test]
+    fn iso8601_refused_shapes() {
+        for input in [
+            "2024-02-2",              // too short
+            "2024/02/29",             // wrong date separator
+            "2024-02/29",             // wrong second separator
+            "2024-13-01",             // month out of range
+            "2024-00-10",             // month zero
+            "2024-04-31",             // past the month's end
+            "2024-01-00",             // day zero
+            "2023-02-29",             // not a leap year
+            "1900-02-29",             // century, not a leap year
+            "2024-02-29X09:00",       // unknown time separator
+            "2024-02-29T9:00",        // time too short
+            "2024-02-29T09-00",       // wrong time separator
+            "2024-02-29T24:00",       // hour out of range
+            "2024-02-29T09:60",       // minute out of range
+            "2024-02-29T09:00:61",    // second out of range
+            "2024-02-29T09:00:00.",   // fraction with no digits
+            "2024-02-29T09:00:00Q",   // unknown designator
+            "2024-02-29T09:00:00Zx",  // trailing text
+            "2024-02-29T09:00+24:00", // offset hour out of range
+            "2024-02-29T09:00+05:60", // offset minute out of range
+            "2024-02-29T09:00+99:99", // both out of range
+            "2024-02-29T09:00+5",     // offset hour one digit
+        ] {
+            assert_eq!(
+                Normalizer::parse_iso8601_unix_seconds(input),
+                None,
+                "{input:?}"
+            );
+        }
+    }
+
+    /// A leap second (`:60`) is permitted, and lands on the next second.
+    #[test]
+    fn iso8601_leap_second_is_permitted() {
+        let leap = Normalizer::parse_iso8601_unix_seconds("2016-12-31T23:59:60Z");
+        let next = Normalizer::parse_iso8601_unix_seconds("2017-01-01T00:00:00Z");
+        assert_eq!(leap, next);
     }
 }

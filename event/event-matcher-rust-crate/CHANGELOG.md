@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed — a timezone offset is range-checked
+
+- `Normalizer::parse_iso8601_unix_seconds` accepted any two-digit offset,
+  so `+99:99` parsed as a 99-hour, 99-minute shift and moved the instant.
+  It now refuses an offset hour outside `0..=23` or minute outside
+  `0..=59` (RFC 3339 `time-numoffset`), and the date field is then treated
+  as missing, as for any other malformed date (spec §4.7).
+- Unit tests for the parser's accepted shapes, with expected values
+  computed outside the crate, and for each refused shape; the doctests
+  that already showed some of these do not count toward coverage.
+
 ### Added — the demo binary is tested
 
 - `tests/demo.rs` runs the demo and checks each example shows what its

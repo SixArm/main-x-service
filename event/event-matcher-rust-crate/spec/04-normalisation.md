@@ -87,7 +87,7 @@ Soundex is tuned for English-language names; non-English phonemes may be lost. A
 fn parse_iso8601_unix_seconds(input: &str) -> Option<i64>;
 ```
 
-Total, dependency-free parser from an ISO 8601 / RFC 3339 date or date-time string to Unix seconds. Accepted shapes: `YYYY-MM-DD` (anchors at midnight UTC), `YYYY-MM-DDTHH:MM:SS` with optional fractional seconds (truncated), and a trailing `Z` or `±HH:MM` / `±HHMM` / `±HH` offset; the `T` separator may also be lowercase `t` or a single space. Returns `None` for malformed input or out-of-range components (month not in `1..=12`, day beyond the calendar month — leap years honoured, hour not in `0..=23`, minute not in `0..=59`, second not in `0..=60` — leap seconds permitted).
+Total, dependency-free parser from an ISO 8601 / RFC 3339 date or date-time string to Unix seconds. Accepted shapes: `YYYY-MM-DD` (anchors at midnight UTC), `YYYY-MM-DDTHH:MM:SS` with optional fractional seconds (truncated), and a trailing `Z` or `±HH:MM` / `±HHMM` / `±HH` offset; the `T` separator may also be lowercase `t` or a single space. Returns `None` for malformed input or out-of-range components (month not in `1..=12`, day beyond the calendar month — leap years honoured, hour not in `0..=23`, minute not in `0..=59`, second not in `0..=60` — leap seconds permitted — or an offset whose hour is not in `0..=23` or whose minute is not in `0..=59`, the RFC 3339 `time-numoffset` ranges).
 
 Deterministic and idempotent under canonicalisation: distinct textual layouts denoting the same instant (e.g. `2024-06-26T09:00:00Z` and `2024-06-26T11:00:00+02:00`) MUST return the same number. Consumed by `Scorer::seconds_between` (§6.3) and by deterministic rule 2 (§5.1).
 
