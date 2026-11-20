@@ -10,7 +10,7 @@
 #       podman compose -f ../../examples/compose/authentication-dev.yml build
 #       podman compose -f ../../examples/compose/authentication-dev.yml up -d
 #     NOT full-family.yml / production compose — those run
-#     LOCO_ENV=production, which never logs the magic-link URL
+#     APP_ENV=production, which never logs the magic-link URL
 #     (SEC-A3), and this suite's `setup` project
 #     (tests/integration/auth.setup.ts) has no other way to complete a
 #     real sign-in (PRO-P32). See authentication-dev.yml's own header

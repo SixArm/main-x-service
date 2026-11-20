@@ -1,8 +1,8 @@
-// Typed client for the Loco JSON API at /api/*.
+// Typed client for the case-folder JSON API at /api/*.
 //
 // Base URL comes from VITE_API_BASE_URL. It defaults to '' (relative),
 // so requests are same-origin and the dev server proxies /api to the
-// Loco app — this keeps the HttpOnly session cookie first-party (see
+// case-folder service — this keeps the HttpOnly session cookie first-party (see
 // spec/auth.md). Set VITE_API_BASE_URL to talk to a different origin.
 //
 // Every request sends credentials so the session cookie flows.
@@ -32,7 +32,7 @@ const DEFAULT_BASE = '';
 /**
  * Resolve the API origin. Reads `VITE_API_BASE_URL` (trailing slash
  * trimmed); falls back to '' so requests are same-origin and the dev
- * server proxies `/api` to Loco, keeping the session cookie first-party.
+ * server proxies `/api` to the case-folder service, keeping the session cookie first-party.
  * @returns The base URL prefix ('' for same-origin).
  */
 function baseUrl(): string {

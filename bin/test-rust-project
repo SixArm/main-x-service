@@ -28,11 +28,11 @@ ai_exists_or_err() (
 )
 
 ### Main
-test_loco_project() {
+test_rust_project() {
     # dir="$1"
     ai_exists_or_err "$1"
     echo "$1"
-    # Loco service crates put the binary entry at src/bin/main.rs; older
+    # Service crates put the binary entry at src/bin/main.rs; older
     # template crates use src/main.rs. Resolve whichever exists.
     main_rs="$1/src/main.rs"
     test -f "$main_rs" || main_rs="$1/src/bin/main.rs"
@@ -57,4 +57,4 @@ test_loco_project() {
     # cargo report future-incompatibilities
 }
 
-test_loco_project "$1"
+test_rust_project "$1"

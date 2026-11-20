@@ -4,12 +4,13 @@ Every environment variable a Main X Index service reads at runtime, for
 the twelve crates under `agents/share/overview.md`: the ten entity
 registries (person, worker, place, thing, event, course, organization,
 care-pathway, case, portfolio), authentication-service, and
-link-graph-service. Grounded in `std::env::var` call sites and each
-crate's `config/*.yaml` Tera templates, last re-verified 2026-08-30 —
-not in prior docs, several of which had drifted (see §7).
+link-graph-service. Grounded in `std::env::var` call sites and the
+`axa::config` defaults each crate states in `src/app.rs`, last
+re-verified 2026-08-30 — not in prior docs, several of which had
+drifted (see §7).
 
 This is a **reference**, not a tutorial. For how these variables fit
-together operationally, see [`axa.md`](axa.md) (the config/Tera
+together operationally, see [`axa.md`](axa.md) (the configuration
 mechanism), [`jwt-enforcement.md`](jwt-enforcement.md) (the activation
 gate), [`authorization-attributes.md`](authorization-attributes.md)
 (ABAC), [`authentication-sessions.md`](authentication-sessions.md)
@@ -25,27 +26,26 @@ here — file a follow-up if this doc needs to cover them too.
 
 ## 1. Two independent config paths — read this first
 
-**Every crate** (all twelve) boots through **axa's own Tera-templated
-YAML** (`config/{development,production,test}.yaml`), which is where
-`DB_URL`, `PORT`, `HOST`, `JWT_SECRET`, and the `DB_*`/`SMTP_*`
-variables in §2 are actually consumed (`{{ get_env(name="...",
-default="...") }}` calls in the YAML, not a `std::env::var` in Rust —
-easy for a naive grep to miss entirely).
+**Every crate** (all twelve) boots through **axa's configuration**
+(`axa::config`), which reads `DB_URL`, `PORT`, `HOST`, and the
+`DB_*`/`SMTP_*` variables in §2 from the environment, with each
+service's defaults stated in code in `src/app.rs`. There are no config
+files; the variable names are listed in the `axa::config` rustdoc.
 
 **Six of them** — person, worker, place, thing, event, course, the
 older "person-style" layout (`agents/share/architecture.md`) — **also**
 run a second, independent `Config::from_env()` (`src/config/mod.rs`)
 for their own `AppState`, with its **own** `SERVER_PORT`/`DB_URL`
-reads (§3). The two paths can disagree — e.g. axa's yaml binds the
+reads (§3). The two paths can disagree — e.g. axa binds the
 Axum server on `PORT` while these six crates' own state-config also
 reads `SERVER_PORT` for a value that, in the shipped Dockerfiles, only
-matters to code paths outside the loco-served router. Don't assume
+matters to code paths outside the axa-served router. Don't assume
 setting one env var reconfigures both surfaces in these six crates;
 check which path the behaviour you're changing actually goes through.
 
-## 2. axa Tera-config variables (all twelve crates)
+## 2. axa configuration variables (all twelve crates)
 
-Read from `config/production.yaml` (the shape below is the same
+Read by `axa::config` (the shape below is the same
 default value only for entries the family agrees on — course and
 link-graph both have documented one-off defaults, called out in the
 table).
@@ -61,13 +61,12 @@ table).
 | `<P>_AUDIT_ADDRESS_RETENTION_DAYS` | `7` | person, worker, and authentication (`AUTH_`): days a client address stays on an audit row or session before a sweep removes it. `0` keeps nothing past the next hourly sweep. Anything but a whole number stops boot. The row and its hash chain stay. |
 | `PORT` | `8080` (person, worker, place, thing, event) · `8084` (course) · `5150` (organization, care-pathway, case, portfolio, authentication) · `5160` (link-graph) | `server.port` |
 | `HOST` | `http://localhost` | `server.host` |
-| `JWT_SECRET` | **none** in production for every crate except course (`default="unused-course-service-does-not-issue-tokens"`); link-graph has no `auth:` block at all, so it is not read there | `auth.jwt.secret` — an axa config-schema requirement, **not** how any of these crates actually authenticate (that's PASETO, §4; see [`jwt.md`](jwt.md)) |
-| `DB_CONNECT_TIMEOUT` | `500` (ms) | Pool connect timeout — organization, care-pathway, case, portfolio, authentication, link-graph, course only; person/worker/place/thing/event hardcode this in yaml |
+| `DB_CONNECT_TIMEOUT` | `500` (ms) | Pool connect timeout — organization, care-pathway, case, portfolio, authentication, link-graph, course only; person/worker/place/thing/event hardcode this |
 | `DB_IDLE_TIMEOUT` | `500` (ms) | Pool idle timeout — same six crates |
 | `DB_MIN_CONNECTIONS` | `2` (course/link-graph: `1`) | Pool floor — same six |
 | `DB_MAX_CONNECTIONS` | `20` (link-graph: `10`) | Pool ceiling — same six |
 | `SMTP_HOST` / `SMTP_PORT` | `localhost` / `587` | Mailer transport — organization, care-pathway, case, portfolio, authentication only (person/worker/place/thing/event/course/link-graph disable mail or have no mailer block at all) |
-| `SMTP_USER` / `SMTP_PASSWORD` | `""` / `""` | Mailer auth — same five crates. Must be **quoted** in the YAML (`"{{ get_env(...) }}"`) — an unset var renders empty, and an unquoted empty value after `key: ` is YAML `null`, not `""`, which fails axa's `SmtpAuth: String` schema at boot |
+| `SMTP_USER` / `SMTP_PASSWORD` | `""` / `""` | Mailer auth — same five crates. |
 
 ## 3. Person-family `Config::from_env()` (person, worker, place, thing, event, course only)
 
@@ -349,9 +348,7 @@ plan/task/goal/burndown surface):
 
 ## 12. Boot-fails-if-unset, in one place
 
-- `DB_URL` — every crate, production only (no Tera default).
-- `JWT_SECRET` — every crate except course and link-graph, production
-  only.
+- `DB_URL` — every crate, production only (no default).
 - `<P>_BULK_S3_BUCKET` — only when `<P>_BULK_ARTIFACT_BACKEND=s3`.
 - `TOKEN_PRIVATE_KEY_SEED` (or `_FILE`) — authentication-service,
   production only (SEC-A1).

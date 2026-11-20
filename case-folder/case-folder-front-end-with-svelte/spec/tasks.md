@@ -156,4 +156,4 @@
    new mutation behaviour is needed.
 4. Add a nav link in `+layout.svelte`; run `npm run check`.
 5. New API surface? Add it to the
-   [Loco spec](../../case-folder-service-with-rust/spec/routes.md) first.
+   [service spec](../../case-folder-service-with-rust/spec/routes.md) first.

@@ -19,13 +19,7 @@ ignore = [
     "RUSTSEC-2024-0436", # paste (unmaintained), transitive
     "RUSTSEC-2024-0437", # protobuf recursion, transitive
     "RUSTSEC-2024-0449", # unsafe-libyaml (unmaintained, no patch), transitive via axa -> serde_yaml
-    "RUSTSEC-2025-0052", # transitive advisory (loco tree)
-    "RUSTSEC-2026-0173", # transitive advisory (loco tree)
-    "RUSTSEC-2026-0190", # transitive advisory (loco tree)
-    "RUSTSEC-2026-0194", # transitive advisory (loco tree)
     "RUSTSEC-2026-0195", # quick-xml namespace-declaration DoS, transitive (opendal)
-    "RUSTSEC-2026-0204", # transitive advisory (loco tree)
-    "RUSTSEC-2025-0057", # transitive advisory (loco tree)
 ]
 
 [licenses]

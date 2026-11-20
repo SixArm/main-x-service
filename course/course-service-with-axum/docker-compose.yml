@@ -45,15 +45,11 @@ services:
       DATABASE_MAX_CONNECTIONS: 10
       DATABASE_MIN_CONNECTIONS: 2
       SERVER_HOST: 0.0.0.0
-      SERVER_PORT: 8080  # inert for loco boot; PORT (below) is what loco reads
+      SERVER_PORT: 8080  # read by this crate's own config; PORT (below) is what axa binds
       PORT: 8080
       SEARCH_INDEX_PATH: /app/data/search_index
       MATCHING_THRESHOLD: 0.85
       RUST_LOG: info
-      # Required by loco's config schema (auth.jwt.secret has no
-      # default); unused by this crate's actual auth flow, which is
-      # offline PASETO verification (see agents/share/jwt.md).
-      JWT_SECRET: ${JWT_SECRET:-dev-only-unused-jwt-secret}
     ports:
       - "${COURSE_SERVICE_PORT:-8084}:8080"
     networks:

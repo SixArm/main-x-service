@@ -164,9 +164,9 @@ fn jwk_for(kid: &str, public: &[u8; 32]) -> serde_json::Value {
 }
 
 /// The variables that name the environment. `APP_ENV` is the one the shared
-/// configuration reads; the other two are older names still honoured here so
-/// a deployment that sets any of them is covered.
-const ENVIRONMENT_VARS: [&str; 3] = ["APP_ENV", "LOCO_ENV", "RUST_ENV"];
+/// configuration reads; `RUST_ENV` is an older name still honoured here so a
+/// deployment that sets either is covered.
+const ENVIRONMENT_VARS: [&str; 2] = ["APP_ENV", "RUST_ENV"];
 
 /// True when any environment variable names a production-like environment.
 ///
@@ -496,19 +496,16 @@ mod tests {
     #[test]
     fn app_env_production_is_recognised() {
         // The regression this pins: the images set `APP_ENV`, so a guard that
-        // read only `LOCO_ENV` would let production sign with the public dev
-        // seed.
+        // did not read it would let production sign with the public dev seed.
         let lookup = |name: &str| (name == "APP_ENV").then(|| "production".to_string());
         assert!(names_production(lookup));
     }
 
     #[test]
-    fn older_environment_names_are_still_honoured() {
-        for var in ["LOCO_ENV", "RUST_ENV"] {
-            assert!(names_production(
-                |name| (name == var).then(|| "Production".to_string())
-            ));
-        }
+    fn older_environment_name_is_still_honoured() {
+        assert!(names_production(
+            |name| (name == "RUST_ENV").then(|| "Production".to_string())
+        ));
     }
 
     #[test]

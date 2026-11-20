@@ -1,5 +1,5 @@
 // Names of records created by `cargo run -- task seed` in the
-// Loco subproject. Mirroring them here lets tests assert presence
+// case-folder service subproject. Mirroring them here lets tests assert presence
 // without having to query the API for IDs first.
 //
 // See ../../../case-folder-service-with-rust/src/tasks/seed.rs.

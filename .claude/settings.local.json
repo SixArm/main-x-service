@@ -76,7 +76,7 @@
       "Bash(echo \"EXIT: $?\")",
       "Bash(./bin/test)",
       "Bash(echo \"---EXIT:$?---\")",
-      "Bash(chmod +x bin/test-loco-project)",
+      "Bash(chmod +x bin/test-rust-project)",
       "Bash([ -f \"$d/src/lib.rs\" ])",
       "Bash(sort -t: -k1,1 -k2,2n)",
       "Bash(echo \"===BINTEST_EXIT:$?===\")",

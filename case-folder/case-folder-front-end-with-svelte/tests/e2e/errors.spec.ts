@@ -16,7 +16,7 @@ test.describe('API error route', () => {
 
         await page.goto('/folders');
         await expect(page.getByText(/Case Tracking API error/i)).toBeVisible();
-        await expect(page.getByText(/Loco JSON API/i)).toBeVisible();
+        await expect(page.getByText(/case-folder JSON API/i)).toBeVisible();
     });
 
     test('renders the error page for an unknown folder UUID (404 path)', async ({ page }) => {

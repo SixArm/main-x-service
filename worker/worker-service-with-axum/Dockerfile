@@ -110,14 +110,12 @@ EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
     CMD curl --silent --fail http://localhost:8080/api/health || exit 1
 
-# Runtime defaults; override at `podman run -e …`. APP_ENV selects
-# config/production.yaml — a container with no override boots safely
-# in production mode rather than defaulting to loco's own "development".
-# NOTE: loco's own config template reads `PORT` (config/production.yaml
-# `server.port: {{ get_env(name="PORT", default="8080") }}`) — the
-# `SERVER_PORT` this crate's separate `src/config/mod.rs` documents is a
-# different, unrelated config surface (used by non-loco code paths) and
-# does NOT change what port the loco-served binary actually binds.
+# Runtime defaults; override at `podman run -e …`. APP_ENV=production
+# means a container with no override boots in production mode rather
+# than defaulting to "development".
+# NOTE: axa binds `PORT`. The `SERVER_PORT` this crate's separate
+# `src/config/mod.rs` documents is a different config surface and does
+# NOT change what port the server binds.
 ENV APP_ENV=production \
     PORT=8080 \
     RUST_LOG=info \
@@ -125,7 +123,7 @@ ENV APP_ENV=production \
     SERVER_PORT=8080 \
     SEARCH_INDEX_PATH=/app/data/search_index
 
-# loco's CLI entry point: `<bin> start` runs the server (see
+# axa's CLI entry point: `<bin> start` runs the server (see
 # src/bin/main.rs — `axa::cli::main`). A bare `<bin>` with no
 # subcommand only prints the CLI's own --help and exits.
 CMD ["/app/worker-service", "start"]

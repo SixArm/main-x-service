@@ -232,7 +232,7 @@ PR; split larger tasks (`T-12a`, `T-12b`).
   `2026080500000001_bulk_jobs_artifact_deleted_at` adds the column plus a
   partial index (`WHERE artifact_deleted_at IS NULL`) matching the
   sweep's own query. Run via the new `bulk_artifact_sweep` loco task
-  (`cargo loco task bulk_artifact_sweep op:apply`; report-only by default,
+  (`cargo run -- task bulk_artifact_sweep op:apply`; report-only by default,
   mirroring `integrity_resign`'s dry-run posture) — this crate has no
   in-process periodic-timer convention, so scheduling is external (cron /
   a `CronJob` / a systemd timer), the same posture the family already
@@ -953,7 +953,7 @@ PR; split larger tasks (`T-12a`, `T-12b`).
     (`scripts/ci-check.sh test-db`); `cargo test --lib` unaffected.
 
 - [x] **EX-4 — `seed_examples` CLI task.** *(done 2026-08-04)*
-  `cargo loco task seed_examples` loads the repository's shared demo
+  `cargo run -- task seed_examples` loads the repository's shared demo
   fixture (`examples/data/persons.jsonl`, 50 rows including five
   deliberate duplicate pairs) into the `persons` table, for the
   tutorials (repo `tasks.md` EX-4).

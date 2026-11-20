@@ -7,7 +7,7 @@
 version = 2
 yanked = "warn"
 # No advisory is ignored. The twelve this list used to carry came from
-# the loco-era dependency tree; on axa + sqlx none of them is reached,
+# an earlier dependency tree; on axa + sqlx none of them is reached,
 # and cargo-deny reported every one as `advisory-not-detected` (PF-D1).
 # An ignore that matches nothing hides the next real advisory with the
 # same id, so add one back only for an advisory this tree actually hits,

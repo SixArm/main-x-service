@@ -151,7 +151,7 @@ pub fn spawn_reindex_if_empty(db: PgPool) {
     }
     tokio::spawn(async move {
         if let Err(err) = reindex_if_empty(&db).await {
-            tracing::error!(error = %err, "boot reindex failed; run `cargo loco task search_reindex`");
+            tracing::error!(error = %err, "boot reindex failed; run `cargo run -- task search_reindex`");
         }
     });
 }

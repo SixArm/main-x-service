@@ -109,16 +109,12 @@ EXPOSE 5150
 HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
     CMD curl --silent --fail http://localhost:5150/_health/live || exit 1
 
-# Runtime defaults; override at `podman run -e …`. APP_ENV selects
-# config/production.yaml — a container with no override boots safely
-# in production mode rather than defaulting to loco's own "development".
-# JWT_SECRET is required by loco's scaffold-default `auth.jwt` config
-# block (unused — this family authenticates via offline PASETO, see
-# agents/share/authentication-sessions.md — but the field has no
-# fallback, so config loading fails at boot without it).
+# Runtime defaults; override at `podman run -e …`. APP_ENV=production
+# means a container with no override boots in production mode rather
+# than defaulting to "development".
 ENV APP_ENV=production \
     PORT=5150
 
-# loco's CLI entry point: `<bin> start` runs the server (see
+# axa's CLI entry point: `<bin> start` runs the server (see
 # src/bin/main.rs — `axa::cli::main`).
 CMD ["/app/organization-service", "start", "--all"]

@@ -42,12 +42,12 @@ test_repository() {
     ai_exists_or_err "$top"
 }
 
-test_loco_projects() {
+test_rust_projects() {
     find "$top" -maxdepth 2 -type d -name '*-rust-crate' | sort |
     while read -r dir; do
-        "$top/bin/test-loco-project" "$dir" || true
+        "$top/bin/test-rust-project" "$dir" || true
     done
 }
 
 test_repository
-test_loco_projects
+test_rust_projects

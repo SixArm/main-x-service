@@ -4,10 +4,10 @@
 // must be a BROWSER navigation to the auth service so the browser itself
 // can visit the identity provider and come back.
 
-/** Base URL of the auth service (the Loco app that hosts /api/auth/*). */
+/** Base URL of the auth service (the case-folder service that hosts /api/auth/*). */
 const AUTH_API_URL = (
     process.env.AUTH_API_URL ||
-    process.env.LOCO_API_PROXY ||
+    process.env.CASE_FOLDER_API_URL ||
     'http://localhost:5150'
 ).replace(/\/$/, '');
 

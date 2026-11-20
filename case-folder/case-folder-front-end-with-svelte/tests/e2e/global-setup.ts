@@ -1,6 +1,6 @@
 // Pre-flight + sign-in for the e2e suite.
 //
-// 1. Verify the Loco API is reachable through the dev-server proxy.
+// 1. Verify the case-folder API is reachable through the dev-server proxy.
 // 2. Sign in once with the demo allowlist identity (magic link →
 //    verify) so we hold a real session cookie.
 // 3. Verify the API is seeded with demo data.
@@ -23,7 +23,7 @@ function fail(message: string): never {
         `\n${banner}\n` +
             `Playwright pre-flight failed.\n\n` +
             `${message}\n\n` +
-            `Make sure the Loco JSON API is running in stub mode (it seeds\n` +
+            `Make sure the case-folder JSON API is running in stub mode (it seeds\n` +
             `demo data and the auth allowlist incl. ${LOGIN_EMAIL}):\n` +
             `  cd ../case-folder-service-with-rust\n` +
             `  USE_UPSTREAM_STUBS=1 cargo run -- start     # listens on :5150\n\n` +

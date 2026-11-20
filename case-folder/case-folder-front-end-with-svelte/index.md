@@ -29,7 +29,7 @@ tracks paper case-note folders across NHS hospital cabinets.
 2. From this project: `npm install && npm run dev` — opens at
    <http://localhost:5173>.
 3. The dev server proxies `/api` to the axa app (same-origin, cookie
-   preserved). Set `LOCO_API_PROXY` to retarget the proxy, or
+   preserved). Set `CASE_FOLDER_API_URL` to retarget the proxy, or
    `VITE_API_BASE_URL` to point the client at a different origin. See
    [README.md](README.md) ("API URL & the same-origin proxy").
 

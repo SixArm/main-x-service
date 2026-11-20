@@ -103,9 +103,9 @@ EXPOSE 5150
 HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
     CMD curl --silent --fail http://localhost:5150/_health/live || exit 1
 
-# Runtime defaults; override at `podman run -e …`. APP_ENV selects
-# config/production.yaml — a container with no override boots safely
-# in production mode rather than defaulting to loco's own "development".
+# Runtime defaults; override at `podman run -e …`. APP_ENV=production
+# means a container with no override boots in production mode rather
+# than defaulting to "development".
 # TOKEN_PRIVATE_KEY_SEED (or TOKEN_PRIVATE_KEY_FILE) is REQUIRED in
 # production — the dev-only fallback seed is refused outside an
 # explicitly non-production environment (SEC-A1, fail-closed). Set it
@@ -114,6 +114,6 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
 ENV APP_ENV=production \
     PORT=5150
 
-# loco's CLI entry point: `<bin> start` runs the server (see
+# axa's CLI entry point: `<bin> start` runs the server (see
 # src/bin/main.rs — `axa::cli::main`).
 CMD ["/app/authentication-service-cli", "start"]

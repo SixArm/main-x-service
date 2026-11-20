@@ -81,7 +81,7 @@
   `page.goto` the real `/verify?token=…` URL and save the resulting
   `__Host-mxi_session` / `__Host-mxi_csrf` cookies as a `storageState`
   the `integration` project depends on and reuses. This only works
-  against a live authentication-service running in `LOCO_ENV=development`
+  against a live authentication-service running in `APP_ENV=development`
   (SEC-A3 — a production-mode container never logs the magic link),
   which had no compose file anywhere in the repo — added
   `examples/compose/authentication-dev.yml` (family-reusable, not

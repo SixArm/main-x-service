@@ -50,7 +50,7 @@ services:
 
       # Server configuration
       SERVER_HOST: 0.0.0.0
-      SERVER_PORT: 8080  # inert for loco boot; PORT (below) is what loco reads
+      SERVER_PORT: 8080  # read by this crate's own config; PORT (below) is what axa binds
       PORT: 8080
 
       # Search configuration
@@ -65,10 +65,6 @@ services:
 
       # Logging
       RUST_LOG: ${RUST_LOG:-info}
-      # Required by loco's config schema (auth.jwt.secret has no
-      # default); unused by this crate's actual auth flow, which is
-      # offline PASETO verification (see agents/share/jwt.md).
-      JWT_SECRET: ${JWT_SECRET:-dev-only-unused-jwt-secret}
       RUST_BACKTRACE: ${RUST_BACKTRACE:-0}
     ports:
       - "${EVENT_PORT:-8080}:8080"

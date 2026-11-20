@@ -73,7 +73,7 @@ alongside OIDC in the same pass.
 | Build | `cargo build` |
 | Test | `cargo test` (DB-free: unit + contract tests); `cargo test -- --ignored` for the Postgres-backed model/request tests. |
 | Lint | `cargo clippy --bins` |
-| Run | `cargo run -- start` (needs Postgres; see README). Works here via this crate's own `.cargo/config.toml` alias (`loco = "run --"`) when run from inside this directory — no `cargo-loco` shim needs to be installed. Same for `cargo run -- db migrate`, `cargo run -- task …`. If it ever doesn't resolve (e.g. invoked via `--manifest-path` from elsewhere, which does not pick up this local alias), `cargo run -- start` / `-- db migrate` / `-- task …` is the equivalent. |
+| Run | `cargo run -- start` (needs Postgres; see README). Likewise `cargo run -- db migrate` and `cargo run -- task …`. |
 
 ---
 

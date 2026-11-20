@@ -88,7 +88,7 @@ COPY --from=builder --chown=place:place \
 
 
 # Tantivy full-text index (SEARCH_INDEX_PATH — this crate's own
-# src/config/ module, not the loco config's search key; default
+# src/config/ module, not axa's configuration; default
 # `./data/search_index` relative to CWD).
 RUN mkdir -p /app/data/search_index && chown -R place:place /app
 
@@ -108,14 +108,14 @@ EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
     CMD curl --silent --fail http://localhost:8080/api/health || exit 1
 
-# Runtime defaults; override at `podman run -e …`. APP_ENV selects
-# config/production.yaml — a container with no override boots safely
-# in production mode rather than defaulting to loco's own "development".
+# Runtime defaults; override at `podman run -e …`. APP_ENV=production
+# means a container with no override boots in production mode rather
+# than defaulting to "development".
 # SEARCH_INDEX_PATH matches the volume created above.
 ENV APP_ENV=production \
     PORT=8080 \
     SEARCH_INDEX_PATH=/app/data/search_index
 
-# loco's CLI entry point: `<bin> start` runs the server (see
+# axa's CLI entry point: `<bin> start` runs the server (see
 # src/bin/main.rs — `axa::cli::main`).
 CMD ["/app/place-service", "start"]

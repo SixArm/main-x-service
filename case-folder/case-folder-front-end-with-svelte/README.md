@@ -119,7 +119,7 @@ the magic-link session's HttpOnly cookie is preserved (see
 
 ```bash
 # Change the dev-proxy TARGET while staying same-origin (cookie preserved):
-LOCO_API_PROXY=http://localhost:5150 npm run dev   # see vite.config.ts
+CASE_FOLDER_API_URL=http://localhost:5150 npm run dev   # see vite.config.ts
 
 # Point the client at a DIFFERENT origin (bypasses the proxy). This makes
 # /api requests cross-origin, which changes cookie behaviour — only use
@@ -131,9 +131,9 @@ Optional SSO (OIDC / Keycloak via the auth service): set
 `PUBLIC_OIDC_SIGNIN_ENABLED=true` to show "Sign in with SSO" on `/login`
 (the `/login/sso` route redirects the browser to
 `${AUTH_API_URL}/api/auth/oidc/login`; `AUTH_API_URL` defaults to
-`LOCO_API_PROXY`, then `http://localhost:5150`). See `.env.example`.
+`CASE_FOLDER_API_URL`, then `http://localhost:5150`). See `.env.example`.
 
-Prefer `LOCO_API_PROXY` for local dev; reach for `VITE_API_BASE_URL`
+Prefer `CASE_FOLDER_API_URL` for local dev; reach for `VITE_API_BASE_URL`
 only when you deliberately want a cross-origin client.
 
 If the API is unreachable, the page renders the error route at

@@ -29,7 +29,7 @@ code + tests in one PR.
   stub-mode boot test; display-name cache. (PF-D11; PF-R15)
 - [x] PF-T4 Seed task: synthetic demo hospital — as landed, 1 site
   ("St Elsewhere General"), 5 wards (2 inpatient, 1 assessment, 1
-  escalation, 1 virtual), 76 beds (`cargo loco task seed`). (PF-R15)
+  escalation, 1 virtual), 76 beds (`cargo run -- task seed`). (PF-R15)
 
 ## Phase 2 — bed states & journey (PF-R2, PF-R4–R6)
 

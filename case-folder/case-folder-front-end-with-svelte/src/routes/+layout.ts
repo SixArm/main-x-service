@@ -1,4 +1,4 @@
-// Client-side only. The Loco JSON API lives behind the dev-server proxy
+// Client-side only. The case-folder JSON API lives behind the dev-server proxy
 // (`/api` → :5150) so the browser sees one origin and the HttpOnly
 // session cookie is first-party. A production deployment behind a single
 // reverse proxy could re-enable SSR.

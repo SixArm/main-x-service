@@ -9,7 +9,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import type { Building, Cabinet, Folder, MoveEvent, Room } from './types';
 
 // Mock the API client so the cache's mutation methods (which round-trip
-// through `api.*`) can be exercised without any network / Loco backend.
+// through `api.*`) can be exercised without any network / case-folder backend.
 // Each mutation is asserted on its cache side effects, not the HTTP call.
 vi.mock('#lib/api/client.js', () => ({
     api: {

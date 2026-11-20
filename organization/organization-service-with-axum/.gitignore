@@ -30,7 +30,7 @@ target/
 *.sqlite-*
 
 # Tantivy full-text index (`src/search/`). Derived from Postgres and
-# rebuildable with `cargo loco task search_reindex`, so it is never
+# rebuildable with `cargo run -- task search_reindex`, so it is never
 # committed. Default path is `./data/search-index`
 # (`ORGANIZATION_SEARCH_INDEX_PATH`).
 /data/

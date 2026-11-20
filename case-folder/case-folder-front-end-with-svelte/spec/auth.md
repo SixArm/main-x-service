@@ -23,7 +23,7 @@ Both are **exempt** from the layout auth guard.
   `requestLink`, `verify`, `me`, `logout`. Base URL defaults to **relative**
   (`/api`) so requests are same-origin through the dev proxy.
 - **`vite.config.ts`** — `server.proxy` forwards `/api` (and `/healthz`)
-  to the axa API (`LOCO_API_PROXY`, default `http://localhost:5150`), so
+  to the axa API (`CASE_FOLDER_API_URL`, default `http://localhost:5150`), so
   the browser sees one origin and the HttpOnly cookie is first-party.
 - **`src/routes/+layout.ts`** — calls `api.auth.me()`; on `401` (and when
   not already on `/login` or `/auth/callback`) `throw redirect(307, '/login')`;

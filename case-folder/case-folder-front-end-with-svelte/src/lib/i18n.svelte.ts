@@ -190,7 +190,7 @@ const STRINGS = {
         'error.heading': 'خطأ في واجهة برمجة تطبيقات تتبع الحالات',
         'error.unknown': 'خطأ غير معروف',
         'error.apiHint':
-            'يتواصل التطبيق مع واجهة Loco JSON عبر /api (موجَّهة إلى خادم Loco في التطوير). تأكد من تشغيل تلك الواجهة. راجع README.md § "Quick start".',
+            'يتواصل التطبيق مع واجهة case-folder JSON عبر /api (موجَّهة إلى خادم case-folder في التطوير). تأكد من تشغيل تلك الواجهة. راجع README.md § "Quick start".',
         'login.title': 'تسجيل الدخول',
         'login.intro':
             'أدخل عنوان بريدك الإلكتروني الخاص بالعمل. إذا تم التعرف عليه، سنرسل لك رابط تسجيل دخول لمرة واحدة. لا حاجة لكلمة مرور.',
@@ -794,7 +794,7 @@ const STRINGS = {
         'error.heading': 'Gwall API Olrhain Achosion',
         'error.unknown': 'Gwall anhysbys',
         'error.apiHint':
-            "Mae'r ap yn siarad â'r API JSON Loco drwy /api (wedi'i ddirprwyo i'r gweinydd Loco wrth ddatblygu). Sicrhewch fod yr API hwnnw'n rhedeg. Gweler README.md § \"Quick start\".",
+            "Mae'r ap yn siarad â'r API JSON case-folder drwy /api (wedi'i ddirprwyo i'r gweinydd case-folder wrth ddatblygu). Sicrhewch fod yr API hwnnw'n rhedeg. Gweler README.md § \"Quick start\".",
         'login.title': 'Mewngofnodi',
         'login.intro':
             'Rhowch eich cyfeiriad e-bost gwaith. Os caiff ei adnabod, byddwn yn anfon dolen fewngofnodi un-tro atoch. Dim cyfrinair yn ofynnol.',
@@ -1425,7 +1425,7 @@ const STRINGS = {
         'error.heading': 'Aktenverfolgung-API-Fehler',
         'error.unknown': 'Unbekannter Fehler',
         'error.apiHint':
-            'Die App kommuniziert über /api mit der Loco-JSON-API (in der Entwicklung an den Loco-Server weitergeleitet). Stellen Sie sicher, dass diese API läuft. Siehe README.md § "Quick start".',
+            'Die App kommuniziert über /api mit der case-folder-JSON-API (in der Entwicklung an den case-folder-Server weitergeleitet). Stellen Sie sicher, dass diese API läuft. Siehe README.md § "Quick start".',
         'login.title': 'Anmelden',
         'login.intro':
             'Geben Sie Ihre dienstliche E-Mail-Adresse ein. Wird sie erkannt, senden wir Ihnen einen einmaligen Anmeldelink. Kein Passwort erforderlich.',
@@ -2068,7 +2068,7 @@ const STRINGS = {
         'error.heading': 'Case Tracking API error',
         'error.unknown': 'Unknown error',
         'error.apiHint':
-            'The app talks to the Loco JSON API through /api (proxied to the Loco server in dev). Make sure that API is running. See README.md § "Quick start".',
+            'The app talks to the case-folder JSON API through /api (proxied to the case-folder server in dev). Make sure that API is running. See README.md § "Quick start".',
         // Login
         'login.title': 'Sign in',
         'login.intro':
@@ -2719,7 +2719,7 @@ const STRINGS = {
         'error.heading': 'Error de la API de Seguimiento de casos',
         'error.unknown': 'Error desconocido',
         'error.apiHint':
-            'La aplicación se comunica con la API JSON de Loco a través de /api (con proxy al servidor Loco en desarrollo). Asegúrese de que esa API esté en ejecución. Consulte README.md § "Quick start".',
+            'La aplicación se comunica con la API JSON de case-folder a través de /api (con proxy al servidor case-folder en desarrollo). Asegúrese de que esa API esté en ejecución. Consulte README.md § "Quick start".',
         'login.title': 'Iniciar sesión',
         'login.intro':
             'Introduzca su correo electrónico de trabajo. Si se reconoce, le enviaremos un enlace de inicio de sesión de un solo uso. No se requiere contraseña.',
@@ -3363,7 +3363,7 @@ const STRINGS = {
         'error.heading': "Erreur de l'API Suivi des dossiers",
         'error.unknown': 'Erreur inconnue',
         'error.apiHint':
-            "L'application communique avec l'API JSON Loco via /api (proxy vers le serveur Loco en développement). Assurez-vous que cette API est en cours d'exécution. Voir README.md § \"Quick start\".",
+            "L'application communique avec l'API JSON case-folder via /api (proxy vers le serveur case-folder en développement). Assurez-vous que cette API est en cours d'exécution. Voir README.md § \"Quick start\".",
         'login.title': 'Se connecter',
         'login.intro':
             'Saisissez votre adresse e-mail professionnelle. Si elle est reconnue, nous vous enverrons un lien de connexion à usage unique. Aucun mot de passe requis.',
@@ -4003,7 +4003,7 @@ const STRINGS = {
         'error.heading': 'केस ट्रैकिंग API त्रुटि',
         'error.unknown': 'अज्ञात त्रुटि',
         'error.apiHint':
-            'ऐप /api के माध्यम से Loco JSON API से बात करता है (विकास में Loco सर्वर पर प्रॉक्सी)। सुनिश्चित करें कि वह API चल रहा है। README.md § "Quick start" देखें।',
+            'ऐप /api के माध्यम से case-folder JSON API से बात करता है (विकास में case-folder सर्वर पर प्रॉक्सी)। सुनिश्चित करें कि वह API चल रहा है। README.md § "Quick start" देखें।',
         'login.title': 'साइन इन',
         'login.intro':
             'अपना कार्य ईमेल पता दर्ज करें। यदि इसे पहचाना जाता है, तो हम आपको एक बार उपयोग होने वाला साइन-इन लिंक भेजेंगे। कोई पासवर्ड आवश्यक नहीं।',
@@ -4625,7 +4625,7 @@ const STRINGS = {
         'error.heading': '病案追踪 API 错误',
         'error.unknown': '未知错误',
         'error.apiHint':
-            '该应用通过 /api 与 Loco JSON API 通信（开发时代理到 Loco 服务器）。请确保该 API 正在运行。参见 README.md § "Quick start"。',
+            '该应用通过 /api 与 case-folder JSON API 通信（开发时代理到 case-folder 服务器）。请确保该 API 正在运行。参见 README.md § "Quick start"。',
         'login.title': '登录',
         'login.intro':
             '请输入您的工作电子邮件地址。如被识别，我们将向您发送一次性登录链接。无需密码。',

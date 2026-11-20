@@ -122,12 +122,12 @@ EXPOSE 5150
 HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
     CMD curl --silent --fail http://localhost:5150/_health/live || exit 1
 
-# Runtime defaults; override at `podman run -e …`. APP_ENV selects
-# config/production.yaml — a container with no override boots safely
-# in production mode rather than defaulting to loco's own "development".
+# Runtime defaults; override at `podman run -e …`. APP_ENV=production
+# means a container with no override boots in production mode rather
+# than defaulting to "development".
 ENV APP_ENV=production \
     PORT=5150
 
-# loco's CLI entry point: `<bin> start` runs the server (see
+# axa's CLI entry point: `<bin> start` runs the server (see
 # src/bin/main.rs — `axa::cli::main`).
 CMD ["/app/care-pathway-service", "start", "--all"]
