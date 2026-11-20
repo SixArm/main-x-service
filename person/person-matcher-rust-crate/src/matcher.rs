@@ -2495,6 +2495,61 @@ mod tests {
     /// per-identifier weight of `0.30`, phonetic matching on, and
     /// `strict_mode` off. Guards against accidental drift of the shipped
     /// configuration baseline.
+    /// Every breakdown component counts toward the score, at its own
+    /// configured weight: alone at 1.0 against a 0.0 given name it must
+    /// give exactly `w / (w + w_given_name)`. A component added to the
+    /// breakdown but not to the weighted sum, or summed against another
+    /// component's weight, fails here by name. (Two components whose
+    /// default weights are equal cannot be told apart this way.)
+    #[test]
+    fn every_component_counts_at_its_own_weight() {
+        let engine = MatchingEngine::default_config();
+        let config = serde_json::to_value(&engine.config).expect("config serialises");
+        let empty: MatchBreakdown = serde_json::from_str("{}").expect("all components optional");
+        let keys: Vec<String> = serde_json::to_value(&empty)
+            .expect("breakdown serialises")
+            .as_object()
+            .expect("an object")
+            .keys()
+            .cloned()
+            .collect();
+        let weight = |key: &str| {
+            config[key.replace("_score", "_weight")]
+                .as_f64()
+                .unwrap_or_else(|| panic!("no weight for {key}"))
+        };
+        let baseline = "given_name_score";
+        let mut checked = 0;
+        for key in &keys {
+            // The phonetic score is a bonus with its own fixed rule.
+            if key == baseline || key == "phonetic_name_score" {
+                continue;
+            }
+            let mut b = serde_json::to_value(&empty).expect("serialises");
+            b[key.as_str()] = serde_json::json!(1.0);
+            b[baseline] = serde_json::json!(0.0);
+            let b: MatchBreakdown = serde_json::from_value(b).expect("deserialises");
+            let (w, w0) = (weight(key), weight(baseline));
+            let expected = w / (w + w0);
+            let got = engine.calculate_weighted_score(&b);
+            assert!(
+                approx_eq(got, expected),
+                "{key}: got {got}, expected {expected} (weight {w})"
+            );
+            checked += 1;
+        }
+        assert_eq!(checked, keys.len() - 2, "every component was checked");
+    }
+
+    /// With no component at all there is no evidence, and the score is 0,
+    /// not a division by zero.
+    #[test]
+    fn empty_breakdown_scores_zero() {
+        let engine = MatchingEngine::default_config();
+        let empty: MatchBreakdown = serde_json::from_str("{}").expect("all components optional");
+        assert!(engine.calculate_weighted_score(&empty).abs() < f64::EPSILON);
+    }
+
     #[test]
     fn config_default_values() {
         let c = MatchConfig::default();

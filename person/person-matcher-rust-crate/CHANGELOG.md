@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — tests for every score component and the identifier tables
+
+- `every_component_counts_at_its_own_weight`: each of the breakdown's
+  components, alone at 1.0 against a 0.0 given name, must score exactly
+  `w / (w + w_given_name)` under its own configured weight. A component
+  missing from the weighted sum, or summed against another's weight, fails
+  by name (checked by breaking an arm on purpose: both are caught).
+- The *Codice Fiscale* even table is checked against its rule (digit value
+  or letter index) and the odd table against the published one.
+- Each national-identifier parser refuses a wrong-length value, or a wrong
+  character class in each position it checks, before its checksum; the NIE
+  `X`/`Y`/`Z` prefixes map to leading digits. Lines 97.70% → 99.52%.
+
 ### Added — the demo binary is tested
 
 - `tests/demo.rs` runs the demo and checks each example shows what its
