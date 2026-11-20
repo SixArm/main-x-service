@@ -598,6 +598,18 @@ only by that subject.
 
 ## 13. Tasks (live work queue)
 
+- [x] **2026-11-20 — SEC-A1 follow-up: the boot check loads the seed.**
+      `ensure_signing_seed` checked only that `TOKEN_PRIVATE_KEY_SEED` or
+      `TOKEN_PRIVATE_KEY_FILE` was *set*, so in production an empty,
+      non-base64url, wrong-length or unreadable seed passed it and made
+      `keys()` panic on the first token request instead. It now loads the
+      seed, so each of those stops `start` with the reason, in every
+      environment. Seed and `TOKEN_ADDITIONAL_PUBLIC_KEYS` loading read
+      through a lookup and are unit-tested without the environment.
+      **Verified:** the binary refuses to start in production with an
+      empty seed and in development with a malformed one, and starts in
+      development with none and in production with a valid one.
+
 - [x] **2026-11-20 — NW-1: magic-link sign-in can be turned off.**
       `AUTH_MAGIC_LINK_ENABLED=false` leaves `POST /api/auth/signup` and
       `POST /api/auth/magic-link` unmounted (§6.1–§6.2), so an instance

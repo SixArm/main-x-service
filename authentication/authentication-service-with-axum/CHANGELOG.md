@@ -10,6 +10,15 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Fixed — a malformed signing seed stops boot
+
+- The SEC-A1 boot check accepted any set `TOKEN_PRIVATE_KEY_SEED` /
+  `TOKEN_PRIVATE_KEY_FILE`, so an empty, malformed, wrong-length or
+  unreadable seed passed it and the service panicked on the first token
+  request. `start` now loads the seed and refuses with the reason. Tests
+  cover seed sourcing and precedence, additional public keys, and each
+  token-verification refusal.
+
 ### Added — tests for OIDC provisioning and the SMTP settings
 
 - The OIDC callback's account decision had no test for an unknown

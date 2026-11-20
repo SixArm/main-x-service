@@ -196,17 +196,25 @@ fn is_production_env() -> bool {
 /// comes at startup rather than on the first token, and a flag cannot get
 /// past the SEC-A1 guard.
 ///
+/// The seed is loaded, not just looked for, so a malformed or unreadable
+/// one stops boot too, instead of passing here and failing on the first
+/// token.
+///
 /// # Errors
 ///
 /// Fails in production when neither `TOKEN_PRIVATE_KEY_SEED` nor
-/// `TOKEN_PRIVATE_KEY_FILE` is set.
+/// `TOKEN_PRIVATE_KEY_FILE` is set, and in any environment when the one
+/// that is set does not hold a base64url 32-byte seed.
 pub fn ensure_signing_seed(production: bool) -> Result<(), AuthError> {
-    let configured = std::env::var_os("TOKEN_PRIVATE_KEY_SEED").is_some()
-        || std::env::var_os("TOKEN_PRIVATE_KEY_FILE").is_some();
-    if configured {
-        return Ok(());
-    }
-    dev_seed_fallback(production).map(|_| ())
+    ensure_signing_seed_with(production, |name| std::env::var(name).ok())
+}
+
+/// [`ensure_signing_seed`] through `lookup`, for tests.
+fn ensure_signing_seed_with(
+    production: bool,
+    lookup: impl Fn(&str) -> Option<String>,
+) -> Result<(), AuthError> {
+    load_seed_with(production, lookup).map(|_| ())
 }
 
 /// Resolve the primary signing seed: `TOKEN_PRIVATE_KEY_SEED` (inline
@@ -218,9 +226,17 @@ pub fn ensure_signing_seed(production: bool) -> Result<(), AuthError> {
 /// with it would let anyone forge a valid PASETO (e.g. `attrs.access =
 /// ["admin"]`). Boot fails via [`keys`] rather than serving with a known key.
 fn load_seed() -> Result<[u8; 32], AuthError> {
-    let b64 = if let Ok(seed) = std::env::var("TOKEN_PRIVATE_KEY_SEED") {
+    load_seed_with(is_production_env(), |name| std::env::var(name).ok())
+}
+
+/// [`load_seed`] for a given environment, through `lookup`.
+fn load_seed_with(
+    production: bool,
+    lookup: impl Fn(&str) -> Option<String>,
+) -> Result<[u8; 32], AuthError> {
+    let b64 = if let Some(seed) = lookup("TOKEN_PRIVATE_KEY_SEED") {
         Some(seed)
-    } else if let Ok(path) = std::env::var("TOKEN_PRIVATE_KEY_FILE") {
+    } else if let Some(path) = lookup("TOKEN_PRIVATE_KEY_FILE") {
         Some(
             std::fs::read_to_string(&path)
                 .map_err(|e| AuthError::Keys(format!("read {path}: {e}")))?,
@@ -238,7 +254,7 @@ fn load_seed() -> Result<[u8; 32], AuthError> {
                 .try_into()
                 .map_err(|_| AuthError::Keys("seed is not 32 bytes".to_string()))
         }
-        None => dev_seed_fallback(is_production_env()),
+        None => dev_seed_fallback(production),
     }
 }
 
@@ -261,8 +277,13 @@ fn dev_seed_fallback(is_production: bool) -> Result<[u8; 32], AuthError> {
 /// `TOKEN_ADDITIONAL_PUBLIC_KEYS` (comma-separated base64url 32-byte
 /// Ed25519 public keys). Unset/empty ⇒ none.
 fn additional_public_keys() -> Result<Vec<[u8; 32]>, AuthError> {
+    additional_public_keys_from(std::env::var("TOKEN_ADDITIONAL_PUBLIC_KEYS").ok())
+}
+
+/// Parse a `TOKEN_ADDITIONAL_PUBLIC_KEYS` value.
+fn additional_public_keys_from(value: Option<String>) -> Result<Vec<[u8; 32]>, AuthError> {
     let mut out = Vec::new();
-    if let Ok(list) = std::env::var("TOKEN_ADDITIONAL_PUBLIC_KEYS") {
+    if let Some(list) = value {
         for entry in list.split(',').map(str::trim).filter(|s| !s.is_empty()) {
             let bytes = URL_SAFE_NO_PAD
                 .decode(entry)
@@ -543,6 +564,166 @@ mod tests {
         assert_eq!(
             dev_seed_fallback(false).expect("dev/test allows the dev seed"),
             DEV_SEED,
+        );
+    }
+
+    fn lookup(pairs: &[(&str, &str)]) -> impl Fn(&str) -> Option<String> {
+        let pairs: Vec<(String, String)> = pairs
+            .iter()
+            .map(|(k, v)| ((*k).to_string(), (*v).to_string()))
+            .collect();
+        move |name| {
+            pairs
+                .iter()
+                .find(|(k, _)| k == name)
+                .map(|(_, v)| v.clone())
+        }
+    }
+
+    fn b64(bytes: &[u8]) -> String {
+        URL_SAFE_NO_PAD.encode(bytes)
+    }
+
+    /// A seed file in the temp directory, removed when dropped.
+    struct SeedFile(std::path::PathBuf);
+    impl SeedFile {
+        fn new(contents: &str) -> Self {
+            static N: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+            let n = N.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            let path = std::env::temp_dir().join(format!("auth-seed-{}-{n}", std::process::id()));
+            std::fs::write(&path, contents).expect("write seed file");
+            Self(path)
+        }
+        fn path(&self) -> &str {
+            self.0.to_str().expect("utf-8 temp path")
+        }
+    }
+    impl Drop for SeedFile {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_file(&self.0);
+        }
+    }
+
+    /// SEC-A1 at boot: production with no seed is refused; with a valid
+    /// seed, inline or from a file, it boots; development may use the dev
+    /// seed.
+    #[test]
+    fn boot_check_refuses_production_without_a_seed() {
+        assert!(ensure_signing_seed_with(true, lookup(&[])).is_err());
+        assert!(ensure_signing_seed_with(false, lookup(&[])).is_ok());
+        let seed = b64(&OTHER_SEED);
+        assert!(
+            ensure_signing_seed_with(true, lookup(&[("TOKEN_PRIVATE_KEY_SEED", &seed)])).is_ok()
+        );
+        let file = SeedFile::new(&format!("{seed}\n"));
+        assert!(
+            ensure_signing_seed_with(true, lookup(&[("TOKEN_PRIVATE_KEY_FILE", file.path())]))
+                .is_ok()
+        );
+    }
+
+    /// A seed that is set but unusable stops boot, rather than passing the
+    /// check and failing on the first token.
+    #[test]
+    fn boot_check_refuses_a_malformed_or_unreadable_seed() {
+        for (why, pairs) in [
+            ("empty", vec![("TOKEN_PRIVATE_KEY_SEED", "")]),
+            ("not base64url", vec![("TOKEN_PRIVATE_KEY_SEED", "!!!")]),
+            (
+                "16 bytes",
+                vec![("TOKEN_PRIVATE_KEY_SEED", "AAAAAAAAAAAAAAAAAAAAAA")],
+            ),
+            (
+                "missing file",
+                vec![("TOKEN_PRIVATE_KEY_FILE", "/nonexistent/seed")],
+            ),
+        ] {
+            for production in [true, false] {
+                assert!(
+                    ensure_signing_seed_with(production, lookup(&pairs)).is_err(),
+                    "{why} (production={production})"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn inline_seed_wins_over_file_and_both_are_trimmed() {
+        let file = SeedFile::new(&b64(&DEV_SEED));
+        let inline = format!("  {}  ", b64(&OTHER_SEED));
+        let seed = load_seed_with(
+            true,
+            lookup(&[
+                ("TOKEN_PRIVATE_KEY_SEED", &inline),
+                ("TOKEN_PRIVATE_KEY_FILE", file.path()),
+            ]),
+        )
+        .expect("loads");
+        assert_eq!(seed, OTHER_SEED);
+        let from_file = load_seed_with(true, lookup(&[("TOKEN_PRIVATE_KEY_FILE", file.path())]));
+        assert_eq!(from_file.expect("loads"), DEV_SEED);
+    }
+
+    #[test]
+    fn additional_keys_parse_skip_blanks_and_refuse_bad_entries() {
+        assert_eq!(
+            additional_public_keys_from(None).unwrap(),
+            Vec::<[u8; 32]>::new()
+        );
+        let a = b64(&[1u8; 32]);
+        let b = b64(&[2u8; 32]);
+        let keys = additional_public_keys_from(Some(format!(" {a}, ,{b},"))).unwrap();
+        assert_eq!(keys, vec![[1u8; 32], [2u8; 32]]);
+        assert!(additional_public_keys_from(Some("!!!".into())).is_err());
+        assert!(additional_public_keys_from(Some(b64(&[3u8; 16]))).is_err());
+    }
+
+    /// Each structural and claim check refuses its own failure.
+    #[test]
+    fn verify_refuses_each_kind_of_bad_token() {
+        let k = dev_keys();
+        let good = mint(&k.signing_keypair, &k.kid, &claims_for(&k, "s", 3600)).unwrap();
+        assert!(verify_with(&k, &good).is_ok());
+
+        let with = |edit: &dyn Fn(&mut Claims)| {
+            let mut c = claims_for(&k, "s", 3600);
+            edit(&mut c);
+            mint(&k.signing_keypair, &k.kid, &c).unwrap()
+        };
+        let cases: Vec<(&str, String)> = vec![
+            ("wrong prefix", good.replacen("v4.public.", "v4.local.", 1)),
+            ("issuer", with(&|c| c.iss = "someone-else".into())),
+            ("audience", with(&|c| c.aud = "another-api".into())),
+            (
+                "not yet valid",
+                with(&|c| c.nbf = Some(chrono::Utc::now().timestamp() + 600)),
+            ),
+        ];
+        for (why, token) in cases {
+            assert!(verify_with(&k, &token).is_err(), "{why}");
+        }
+
+        // A footer that is not JSON, or carries no kid, selects no key.
+        let unsigned = good.rsplit_once('.').unwrap().0;
+        for footer in ["not-json", r#"{"other":"x"}"#] {
+            let token = format!("{unsigned}.{}", b64(footer.as_bytes()));
+            assert!(verify_with(&k, &token).is_err(), "footer {footer}");
+        }
+    }
+
+    #[test]
+    fn key_errors_display_their_kind() {
+        assert_eq!(
+            AuthError::Keys("k".into()).to_string(),
+            "paseto key error: k"
+        );
+        assert_eq!(
+            AuthError::Sign("s".into()).to_string(),
+            "paseto sign error: s"
+        );
+        assert_eq!(
+            AuthError::Verify("v".into()).to_string(),
+            "paseto verify error: v"
         );
     }
 
