@@ -15,6 +15,15 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
   third byte panicked. It now compares by character. Not reachable from a
   request: no request path scores with this module since T-16.
 
+### Added — unit tests for the validators
+
+- Addresses need a city, postal code or country, bare or on a place, and
+  are capped; virtual locations need an http(s) URL; offers check
+  currency, price, ISO 4217 shape and a forward validity window;
+  identifiers and every party role need their fields; contact points by
+  system; phone normalisation. Found, and left open in spec §13, that a
+  national trunk `0` survives normalisation.
+
 ### Added — unit tests for the standalone matching algorithms
 
 - Every location variant pairing, postal-code prefixes, geo proximity,

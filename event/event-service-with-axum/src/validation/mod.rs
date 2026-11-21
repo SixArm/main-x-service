@@ -1083,4 +1083,190 @@ mod tests {
             "{at_cap} sits at the cap and should pass, got {errors:?}"
         );
     }
+
+    fn has(errors: &[ValidationError], field: &str) -> bool {
+        errors.iter().any(|e| e.field == field)
+    }
+
+    fn addr(
+        city: Option<&str>,
+        postal: Option<&str>,
+        country: Option<&str>,
+    ) -> crate::models::Address {
+        crate::models::Address {
+            use_type: None,
+            line1: Some("1 Long Street".to_string()),
+            line2: None,
+            city: city.map(str::to_string),
+            state: None,
+            postal_code: postal.map(str::to_string),
+            country: country.map(str::to_string),
+        }
+    }
+
+    /// An address needs a city, postal code or country, whether it is a
+    /// bare postal address or a place's; an over-long field is capped.
+    #[test]
+    fn addresses_need_somewhere_and_are_capped() {
+        let mut event = Event::new("Test", start());
+        event.location = vec![
+            Location::PostalAddress(addr(None, Some("  "), None)),
+            Location::PostalAddress(addr(Some("Cardiff"), None, None)),
+            Location::Place(Place {
+                id: None,
+                name: "Hall".to_string(),
+                address: Some(addr(None, None, None)),
+                latitude_as_decimal_degrees: None,
+                longitude_as_decimal_degrees: None,
+                url: None,
+            }),
+            Location::PostalAddress(addr(Some(&"x".repeat(5000)), None, None)),
+        ];
+        let errors = validate_event(&event);
+        assert!(has(&errors, "location[0]"), "{errors:?}");
+        assert!(!has(&errors, "location[1]"));
+        assert!(has(&errors, "location[2].address"), "{errors:?}");
+        assert!(
+            errors
+                .iter()
+                .any(|e| e.field.starts_with("location[3]") && e.field.ends_with("city")),
+            "{errors:?}"
+        );
+    }
+
+    /// A virtual location needs an http(s) URL.
+    #[test]
+    fn virtual_locations_need_a_web_url() {
+        let mut event = Event::new("Test", start());
+        let v = |url: &str| {
+            Location::Virtual(VirtualLocation {
+                name: None,
+                url: url.to_string(),
+            })
+        };
+        event.location = vec![v(" "), v("ftp://x.test"), v("https://x.test/live")];
+        let errors = validate_event(&event);
+        assert!(has(&errors, "location[0].url"));
+        assert!(has(&errors, "location[1].url"));
+        assert!(!has(&errors, "location[2].url"));
+    }
+
+    /// An offer: a price needs a currency and must be a number, the
+    /// currency is three letters, and the validity window runs forwards.
+    #[test]
+    fn offers_are_checked() {
+        use crate::models::Offer;
+        let offer = |price: Option<&str>, currency: Option<&str>| Offer {
+            name: None,
+            price: price.map(str::to_string),
+            price_currency: currency.map(str::to_string),
+            url: None,
+            availability: None,
+            valid_from: None,
+            valid_through: None,
+        };
+        let mut backwards = offer(Some("10"), Some("GBP"));
+        backwards.valid_from = Some(start());
+        backwards.valid_through = Some(start() - chrono::Duration::days(1));
+        let mut event = Event::new("Test", start());
+        event.offers = vec![
+            offer(Some("10"), None),
+            offer(Some("ten"), Some("GBP")),
+            offer(Some("10"), Some("POUNDS")),
+            offer(Some("10"), Some("G1P")),
+            backwards,
+            offer(Some("10.50"), Some("GBP")),
+            offer(None, None),
+        ];
+        let errors = validate_event(&event);
+        assert!(has(&errors, "offers[0].price_currency"));
+        assert!(has(&errors, "offers[1].price"));
+        assert!(has(&errors, "offers[2].price_currency"));
+        assert!(has(&errors, "offers[3].price_currency"));
+        assert!(has(&errors, "offers[4].valid_through"));
+        assert!(
+            !errors
+                .iter()
+                .any(|e| e.field.starts_with("offers[5]") || e.field.starts_with("offers[6]")),
+            "{errors:?}"
+        );
+    }
+
+    /// Identifiers need a system and a value; every party role needs a name.
+    #[test]
+    fn identifiers_and_parties_need_their_fields() {
+        use crate::models::{Identifier, IdentifierType, Party, PartyKind};
+        let mut event = Event::new("Test", start());
+        event.identifiers = vec![Identifier::new(
+            IdentifierType::BookingNumber,
+            " ".to_string(),
+            " ".to_string(),
+        )];
+        let unnamed = Party {
+            kind: PartyKind::Person,
+            id: None,
+            name: " ".to_string(),
+            email: None,
+            url: None,
+        };
+        event.organizers = vec![unnamed.clone()];
+        event.performers = vec![unnamed.clone()];
+        event.attendees = vec![unnamed];
+        let errors = validate_event(&event);
+        for field in [
+            "identifiers[0].system",
+            "identifiers[0].value",
+            "organizers[0].name",
+            "performers[0].name",
+            "attendees[0].name",
+        ] {
+            assert!(has(&errors, field), "{field}: {errors:?}");
+        }
+    }
+
+    /// A contact point needs a value; an email needs an `@` and a dot; a
+    /// phone, SMS or fax number needs seven digits; other kinds pass.
+    #[test]
+    fn contact_points_by_system() {
+        use crate::models::{ContactPoint, ContactPointSystem};
+        let check = |system: ContactPointSystem, value: &str| {
+            validate_contact_point(
+                &ContactPoint {
+                    system,
+                    value: value.to_string(),
+                    use_type: None,
+                },
+                "c",
+            )
+            .len()
+        };
+        assert_eq!(
+            check(ContactPointSystem::Email, " "),
+            1,
+            "a value is required"
+        );
+        assert_eq!(check(ContactPointSystem::Email, "nobody"), 1);
+        assert_eq!(check(ContactPointSystem::Email, "a@b"), 1, "no dot");
+        assert_eq!(check(ContactPointSystem::Email, "a@b.test"), 0);
+        for system in [
+            ContactPointSystem::Phone,
+            ContactPointSystem::Sms,
+            ContactPointSystem::Fax,
+        ] {
+            assert_eq!(check(system, "12-34"), 1, "too few digits");
+            assert_eq!(check(system, "+44 20 7946 0000"), 0);
+        }
+        assert_eq!(check(ContactPointSystem::Url, "anything"), 0);
+    }
+
+    /// Phone normalisation: digits only, a country code added when it is
+    /// missing, kept when present, and nothing for no digits.
+    #[test]
+    fn normalize_phone_cases() {
+        assert_eq!(normalize_phone("no digits", "44"), "");
+        assert_eq!(normalize_phone("44 20 7946 0000", "44"), "+442079460000");
+        assert_eq!(normalize_phone("207 946 0000", "44"), "+442079460000");
+        assert_eq!(normalize_phone("+1 555 0100", "44"), "+15550100");
+        assert_eq!(normalize_phone("555 0100", "44"), "+445550100");
+    }
 }
