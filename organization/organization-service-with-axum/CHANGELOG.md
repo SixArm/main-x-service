@@ -9,6 +9,18 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — audit-integrity verification and relay drain tests
+
+- `compliance::audit_integrity` unit tests for `verify`: intact rows
+  verify, rows written before the digest columns are counted as unhashed
+  rather than failed, an edited row is reported once by id and makes the
+  run unverified, and a forged SHA-3 digest alone is caught. Every report
+  carries the caveat that deletion is not detected.
+- `tests/relay_drain.rs`: against a real outbox with no broker, a failing
+  sink publishes nothing and the row waits; a working sink stamps
+  `published_at`, keyed by pid, and does not resend; the retention purge
+  removes published rows.
+
 ### Added — FHIR metadata, round trip and error tests
 
 - `tests/requests/fhir.rs` `fhir_metadata_crud_and_errors`: the

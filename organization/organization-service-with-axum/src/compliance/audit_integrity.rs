@@ -316,4 +316,69 @@ mod tests {
         let bytes = preimage(&input());
         assert!(bytes.starts_with(AUDIT_MAC_VERSION.as_bytes()));
     }
+
+    /// A stored row whose digests were computed from its own content, or
+    /// none at all (written before the columns existed).
+    fn row(id: i64, action: &str, hashed: bool) -> crate::models::audit_logs::Model {
+        let at = chrono::DateTime::parse_from_rfc3339("2026-01-02T03:04:05.123456Z").unwrap();
+        let mut row = crate::models::audit_logs::Model {
+            created_at: at,
+            updated_at: at,
+            id,
+            entity_pid: Uuid::from_u128(7),
+            action: action.to_string(),
+            actor: Some("alice".to_string()),
+            snapshot: Some(serde_json::json!({ "name": "Acme" })),
+            hash: None,
+            hash_sha3: None,
+            mac: None,
+        };
+        if hashed {
+            let d = super::digests(&super::input_for(&row));
+            row.hash = Some(d.sha256);
+            row.hash_sha3 = Some(d.sha3);
+            row.mac = d.mac;
+        }
+        row
+    }
+
+    /// Intact rows verify, unhashed ones are counted rather than failed,
+    /// and a row edited after its digests were written is reported once by
+    /// id, which makes the whole run unverified.
+    #[test]
+    fn verify_counts_intact_unhashed_and_tampered_rows() {
+        let intact = row(1, "created", true);
+        let unhashed = row(2, "updated", false);
+        let mut tampered = row(3, "deleted", true);
+        tampered.actor = Some("mallory".to_string());
+
+        let clean = super::verify(&[intact.clone(), unhashed.clone()]);
+        assert!(clean.verified);
+        assert_eq!((clean.rows, clean.intact, clean.unhashed), (2, 1, 1));
+        assert_eq!((clean.sha3_intact, clean.sha3_unhashed), (1, 1));
+        assert!(clean.mismatched.is_empty());
+        assert!(
+            clean
+                .caveat
+                .contains("does NOT attest that no row was deleted")
+        );
+
+        let report = super::verify(&[intact, unhashed, tampered]);
+        assert!(!report.verified);
+        assert_eq!(report.mismatched, vec![3], "one entry per tampered row");
+        assert_eq!(report.intact, 1);
+
+        // A digest edited to match neither algorithm's output is a break too.
+        let mut forged = row(4, "created", true);
+        forged.hash_sha3 = Some("0".repeat(64));
+        assert_eq!(super::verify(&[forged]).mismatched, vec![4]);
+    }
+
+    /// `tag` is the MAC alone: absent with no key, and matching `digests`.
+    #[test]
+    fn tag_agrees_with_digests() {
+        let r = row(5, "created", false);
+        let input = super::input_for(&r);
+        assert_eq!(super::tag(&input), super::digests(&input).mac);
+    }
 }
