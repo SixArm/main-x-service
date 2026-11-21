@@ -9066,3 +9066,12 @@ Kept as they were by worker's SQ-1, then fixed (crate spec §13).
   containment, `PATCH`), or re-model folders on what thing-service holds.
   The place client had the same envelope drift (`places` vs `results`);
   that one is fixed, since it changes nothing but the key read.
+  **Also the move log (found the same day).** case-folder records every
+  folder move as an Event, posting `event_type: {"Other": "FolderMove"}`,
+  `event_status: "Scheduled"` and `event_attendance_mode: "Offline"`.
+  event-service's `EventType` is a closed snake_case enum with no variant
+  that carries a string, and its status and attendance values are
+  snake_case, so it answers `422` (checked by posting case-folder's own
+  payload to event-service's router): against the real service no move is
+  ever recorded. The casing is case-folder's to fix; the type has nowhere to
+  go, so this is part of the same decision.
