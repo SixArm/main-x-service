@@ -6257,6 +6257,19 @@ running one.
   already did; each crate has a unit test that panics on the old code.
   Found while writing event T-5's privacy tests.
 
+- [x] **SEC-M10 (S)** A far-future `since` panicked the bulk links pull.
+  *(found and done 2026-11-21, raising worker-service coverage)*
+  `GET /api/workers/links?since=` and `GET /api/persons/links?since=`
+  parse an RFC3339 instant, which admits any four-digit year, then
+  converted it through an `i64` of nanoseconds, which ends in 2262, with
+  `.expect` — so `since=2999-01-01T00:00:00Z` panicked the handler into a
+  `500` (security invariant 2). `db/convert.rs` in both crates now goes
+  through whole seconds and the sub-second part: `try_ts_to_offset` is
+  fallible and used for caller input (out of range ⇒ `422`), and both
+  directions are total over `time`'s range (±9999). Tests in each crate
+  fail without the fix. **Open:** event, place and thing carry the same
+  nanosecond `convert.rs`; no caller input reaches it today, but it should
+  take the same rewrite before one does.
 - [x] **DOC-9 (M)** The agents directory name is lowercase.
   *(done 2026-08-21)* Git tracked the agent reference docs under an
   uppercase directory while **878 files referenced the lowercase

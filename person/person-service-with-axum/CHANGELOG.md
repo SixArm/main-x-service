@@ -8,6 +8,14 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ## [Unreleased]
 
+### Fixed — a far-future `since` panicked the bulk links pull (SEC-M10)
+
+- `GET /api/persons/links?since=2999-01-01T00:00:00Z` panicked into a
+  `500`: the instant went through an `i64` of nanoseconds, which ends in
+  2262. The conversions now go through seconds and the sub-second part,
+  caller input converts fallibly (out of range ⇒ `422`), and both
+  directions are total over the years `time` holds.
+
 ### Fixed — FHIR writes take the record-level decision and validation (SEC-G10)
 
 - `PUT` and `DELETE /fhir/Patient/{id}` skipped the record-level ABAC

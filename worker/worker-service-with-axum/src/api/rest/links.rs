@@ -566,10 +566,16 @@ pub async fn bulk_links(
     }
     let since = match params.since.as_deref() {
         None => None,
-        Some(s) => match chrono::DateTime::parse_from_rfc3339(s) {
-            Ok(dt) => Some(crate::db::convert::ts_to_offset(
-                dt.with_timezone(&chrono::Utc),
-            )),
+        // A caller's instant converts fallibly: RFC3339 admits years the
+        // storage type cannot hold, and `since=2999-…` must be a `422`, not
+        // a panic (security invariant 2).
+        Some(s) => match chrono::DateTime::parse_from_rfc3339(s)
+            .map_err(|e| e.to_string())
+            .and_then(|dt| {
+                crate::db::convert::try_ts_to_offset(dt.with_timezone(&chrono::Utc))
+                    .ok_or_else(|| "out of range".to_string())
+            }) {
+            Ok(since) => Some(since),
             Err(e) => {
                 return (
                     StatusCode::UNPROCESSABLE_ENTITY,
