@@ -891,6 +891,30 @@ pub async fn check_duplicates(
     )
 }
 
+/// Fold a duplicate into the survivor (spec §6.4): identifiers, keywords,
+/// amenity features and opening hours the survivor lacks are carried
+/// across, and the duplicate's name becomes the survivor's alternate name
+/// when it has none. Before this the merge stored the survivor unchanged,
+/// so the duplicate's identifiers survived only in the JSON snapshot.
+fn transfer_place_data(main: &Place, duplicate: &Place) -> Place {
+    fn union<T: Clone + PartialEq>(into: &mut Vec<T>, from: &[T]) {
+        for item in from {
+            if !into.contains(item) {
+                into.push(item.clone());
+            }
+        }
+    }
+    let mut merged = main.clone();
+    union(&mut merged.identifiers, &duplicate.identifiers);
+    union(&mut merged.keywords, &duplicate.keywords);
+    union(&mut merged.amenity_features, &duplicate.amenity_features);
+    union(&mut merged.opening_hours, &duplicate.opening_hours);
+    if merged.alternate_name.is_none() && duplicate.name != merged.name {
+        merged.alternate_name = Some(duplicate.name.clone());
+    }
+    merged
+}
+
 /// Merge a duplicate place into a surviving main place.
 #[utoipa::path(post, path = "/api/places/merge", tag = "matching",
     request_body = MergeRequest,
@@ -936,6 +960,7 @@ pub async fn merge_places(
     };
 
     let transferred = serde_json::to_value(&dup).ok();
+    let main = transfer_place_data(&main, &dup);
     // Soft-delete the duplicate and, under the outbox transport, atomically
     // enqueue the `Merged` (survivor, carrying the duplicate's pid) and
     // `Deleted` (duplicate) outbox rows in one transaction.

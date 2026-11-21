@@ -8,6 +8,17 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ## [Unreleased]
 
+### Fixed — a merge carries the duplicate's data to the survivor
+
+- `POST /api/places/merge` stored the survivor unchanged and soft-deleted
+  the duplicate, so the duplicate's identifiers, keywords, amenity features
+  and opening hours survived only in the merge record's JSON snapshot, not
+  on any live place; the repository's `merge` did not write the survivor.
+  They are now carried across without duplicates, the duplicate's name
+  becomes `alternate_name` when the survivor has none, and the survivor is
+  written in the merge's transaction. `same_as`, hierarchy links and a
+  `Replaces` link (spec §6.4) need model fields first: open in §13.
+
 ### Fixed — an update does not bring a deleted record back (SEC-B13)
 
 - `PUT /api/places/{id}` on a soft-deleted record answered `200` and the

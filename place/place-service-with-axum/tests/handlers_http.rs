@@ -58,14 +58,16 @@ async fn call(
 /// A distinct letters-only name, so no two test places look alike to the
 /// create-time duplicate check.
 fn name(prefix: &str) -> String {
+    // Wholly random over 26 letters: a shared prefix (and the earlier
+    // 16-letter suffix) left two test places close enough for the
+    // create-time duplicate check, especially against rows earlier runs
+    // left in the shared database. The prefix is kept for readability, last.
     let letters: String = Uuid::new_v4()
-        .simple()
-        .to_string()
-        .chars()
-        .take(12)
-        .map(|c| char::from(b'a' + u8::try_from(c.to_digit(16).unwrap()).unwrap()))
+        .as_bytes()
+        .iter()
+        .map(|b| char::from(b'a' + b % 26))
         .collect();
-    format!("{prefix} {letters}")
+    format!("{letters} {prefix}")
 }
 
 async fn create(app: &axum::Router, prefix: &str) -> Uuid {
@@ -84,8 +86,22 @@ async fn create(app: &axum::Router, prefix: &str) -> Uuid {
 #[ignore = "requires PostgreSQL (DB_URL)"]
 async fn merge_retires_the_duplicate_and_refuses_bad_pairs() {
     let app = app().await;
-    let main = create(&app, "Mergemain").await;
-    let duplicate = create(&app, "Mergedup").await;
+    let main = create(&app, "Alphahall").await;
+    let code = format!("BR{}", Uuid::new_v4().simple());
+    let dup_name = name("Zuluquay");
+    let (status, body) = call(
+        &app,
+        "POST",
+        "/api/places",
+        Some(&json!({
+            "name": dup_name,
+            "keywords": ["riverside"],
+            "identifiers": [{ "identifier_type": "BranchCode", "value": code }]
+        })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED, "{body}");
+    let duplicate: Uuid = body["id"].as_str().unwrap().parse().unwrap();
 
     let (status, merged) = call(
         &app,
@@ -95,11 +111,15 @@ async fn merge_retires_the_duplicate_and_refuses_bad_pairs() {
     )
     .await;
     assert!(status.is_success(), "{status} {merged}");
+    // The survivor carries what it took from the duplicate (spec §6.4).
+    let (status, survivor) = call(&app, "GET", &format!("/api/places/{main}"), None).await;
+    assert_eq!(status, StatusCode::OK);
+    let text = survivor.to_string();
+    assert!(text.contains(&code), "identifier carried: {text}");
+    assert!(text.contains("riverside"), "keyword carried: {text}");
     assert_eq!(
-        call(&app, "GET", &format!("/api/places/{main}"), None)
-            .await
-            .0,
-        StatusCode::OK
+        survivor["alternate_name"], dup_name,
+        "the duplicate's name is kept"
     );
     assert_eq!(
         call(&app, "GET", &format!("/api/places/{duplicate}"), None)

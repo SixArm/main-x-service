@@ -799,6 +799,17 @@ impl PlaceRepository for PgPlaceRepository {
         // apply, and "B into A" racing "A into B" deletes both. The loser
         // gets `Conflict` (409) and writes nothing.
         lock_merge_participants(&mut txn, survivor.id, *duplicate_id).await?;
+        // The survivor carries what it took from the duplicate (§6.4); it is
+        // written in this transaction, so the transfer and the duplicate's
+        // retirement commit together. Its deletion columns are the server's.
+        let mut row = place_row(survivor);
+        row.updated_at = Utc::now();
+        row.is_deleted = false;
+        row.deleted_at = None;
+        update_place_row(&mut txn, &row).await?;
+        delete_collections(&mut txn, survivor.id).await?;
+        insert_collections(&mut txn, survivor).await?;
+        Self::stamp_digests(&mut txn, survivor.id).await?;
         mark_deleted(&mut txn, *duplicate_id).await?;
         // Durable event bus (Phase 2): a `Merged` outbox row for the survivor
         // (carrying the duplicate's pid via `merged_from`, so a merge-
