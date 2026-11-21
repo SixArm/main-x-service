@@ -103,11 +103,35 @@ async fn fetch_display_name(entity_ref: &EntityRef) -> Option<String> {
         entity_ref.id
     );
     let body: serde_json::Value = reqwest_get_json(&url).await?;
-    // Best-effort name extraction across the family's DTO shapes.
-    ["display_name", "name", "title"]
+    display_name_of(&body)
+}
+
+/// Best-effort name extraction across the family's DTO shapes: a string
+/// `display_name`, `name` or `title`, or a person/worker `name` object
+/// (`{"family": …, "given": […]}`), rendered as given names then family.
+/// Person and worker answer with the object, so reading strings alone
+/// left every patient and staff member shown as a bare URN.
+fn display_name_of(body: &serde_json::Value) -> Option<String> {
+    if let Some(s) = ["display_name", "name", "title"]
         .iter()
         .find_map(|k| body.get(k).and_then(serde_json::Value::as_str))
-        .map(ToString::to_string)
+    {
+        return Some(s.to_string());
+    }
+    let name = body.get("name")?;
+    let given = name
+        .get("given")
+        .and_then(serde_json::Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter_map(serde_json::Value::as_str);
+    let family = name.get("family").and_then(serde_json::Value::as_str);
+    let parts: Vec<&str> = given
+        .chain(family)
+        .map(str::trim)
+        .filter(|p| !p.is_empty())
+        .collect();
+    (!parts.is_empty()).then(|| parts.join(" "))
 }
 
 /// Minimal GET-JSON helper: short timeout, no redirects (SSRF posture,
@@ -129,6 +153,35 @@ async fn reqwest_get_json(url: &str) -> Option<serde_json::Value> {
 
 #[cfg(test)]
 mod tests {
+
+    /// A string name is read as is; a person/worker name object is
+    /// rendered as given names then family; nothing usable is `None`.
+    #[test]
+    fn display_names_across_dto_shapes() {
+        use serde_json::json;
+        assert_eq!(
+            display_name_of(&json!({ "name": "Ward 7" })).as_deref(),
+            Some("Ward 7")
+        );
+        assert_eq!(
+            display_name_of(&json!({ "title": "Stroke pathway" })).as_deref(),
+            Some("Stroke pathway")
+        );
+        assert_eq!(
+            display_name_of(&json!({ "name": { "family": "Jones", "given": ["Ann", "Mair"] } }))
+                .as_deref(),
+            Some("Ann Mair Jones")
+        );
+        assert_eq!(
+            display_name_of(&json!({ "name": { "family": "Jones" } })).as_deref(),
+            Some("Jones")
+        );
+        assert_eq!(
+            display_name_of(&json!({ "name": { "family": " ", "given": [] } })),
+            None
+        );
+        assert_eq!(display_name_of(&json!({ "id": "x" })), None);
+    }
     use super::*;
     use std::str::FromStr;
 

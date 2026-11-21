@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed — patients and staff resolve to names, not URNs
+
+- The display-name lookup read only string `display_name` / `name` /
+  `title` fields, but person and worker answer with `name` as an object
+  (`{"family": …, "given": […]}`), so every patient and staff member was
+  shown as a bare `EntityRef` URN. The object is now rendered as given
+  names then family; place and organization, which answer with a string,
+  are unchanged.
+
 ### Changed — axa 0.11
 
 - `axa` 0.10 → 0.11 and `axa-test` 0.1 → 0.2. **Deploy settings change before
