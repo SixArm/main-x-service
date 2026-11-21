@@ -2590,7 +2590,7 @@
   gate** (framed in `agents/share/security.md` §4 from SEC-I4). The generic
   flag-off `enforce` pin already exists family-wide; this adds the explicit,
   sensitive-path-named form on the flagged services. Feeds OPS-1 runbook.
-- [ ] **SEC-G9 (M) 🔴** FHIR writes skip the record-level decision. *(found
+- [x] **SEC-G9 (M) 🔴** FHIR writes skip the record-level decision. *(closed 2026-11-21)* *(found
   2026-11-20, raising worker-service coverage)* `PUT` and `DELETE` on
   each service's REST surface load the stored record and run
   `authorize_record` on its `resource.*` attributes before writing; the
@@ -2607,7 +2607,9 @@
   - [x] organization — not applicable: its record-level decision is on
     reads only (spec §6.3), so FHIR writes already match REST. Its FHIR
     create/update did skip validation; fixed 2026-11-21.
-  - [ ] care-pathway — `controllers/fhir.rs` `update` / `remove`.
+  - [x] care-pathway — not applicable: its record-level decision is on
+    reads only (`get_one` / `get_export`), so FHIR writes already match
+    REST; it already validated FHIR writes.
   - [x] case — fixed 2026-11-20; FHIR create and update also skipped
     validation (SEC-M1 caps), now applied. `tests/fhir_write_abac.rs`.
   - [x] **FHIR writes skip native validation** (SEC-M1 caps included) in
