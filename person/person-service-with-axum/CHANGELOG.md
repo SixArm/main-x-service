@@ -8,7 +8,7 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ## [Unreleased]
 
-### Fixed — FHIR writes take the record-level decision and validation (SEC-G9)
+### Fixed — FHIR writes take the record-level decision and validation (SEC-G10)
 
 - `PUT` and `DELETE /fhir/Patient/{id}` skipped the record-level ABAC
   check the REST writes run on the stored person, so a `resource.*` policy

@@ -2590,7 +2590,7 @@
   gate** (framed in `agents/share/security.md` §4 from SEC-I4). The generic
   flag-off `enforce` pin already exists family-wide; this adds the explicit,
   sensitive-path-named form on the flagged services. Feeds OPS-1 runbook.
-- [x] **SEC-G9 (M) 🔴** FHIR writes skip the record-level decision. *(closed 2026-11-21)* *(found
+- [x] **SEC-G10 (M) 🔴** FHIR writes skip the record-level decision. *(closed 2026-11-21)* *(Its commits on 2026-11-20/21 say SEC-G9 by mistake; SEC-G9 is the emergency-contact masking item below.)* *(found
   2026-11-20, raising worker-service coverage)* `PUT` and `DELETE` on
   each service's REST surface load the stored record and run
   `authorize_record` on its `resource.*` attributes before writing; the

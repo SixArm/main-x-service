@@ -15,7 +15,7 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
   format rules and the SEC-M1 input-size caps. They now answer a failure
   with a `422` `processing` `OperationOutcome`, one issue per problem.
 
-### Fixed — FHIR writes take the record-level decision (SEC-G9)
+### Fixed — FHIR writes take the record-level decision (SEC-G10)
 
 - `PUT` and `DELETE /fhir/Practitioner/{id}` went straight to the
   repository, skipping the `authorize_record` check the REST writes run on

@@ -1,4 +1,4 @@
-//! SEC-G9: FHIR writes take the record-level decision and the native
+//! SEC-G10: FHIR writes take the record-level decision and the native
 //! validation, as `PUT` / `DELETE /api/cases/{pid}` and `POST /api/cases`
 //! do. Before the fix, `PUT` and `DELETE /fhir/Task/{id}` skipped
 //! `authorize_record` on the stored case, and FHIR create and update skipped

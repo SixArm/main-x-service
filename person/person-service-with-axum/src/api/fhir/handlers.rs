@@ -245,7 +245,7 @@ fn validation_refusal(person: &crate::models::Person) -> Option<Response> {
 }
 
 /// The record-level decision a write takes before it touches the row, as
-/// `PUT` / `DELETE /api/persons/{id}` take it (SEC-G9): load the stored
+/// `PUT` / `DELETE /api/persons/{id}` take it (SEC-G10): load the stored
 /// person (`404` if there is none) and authorise `action` on its
 /// attributes, so a `resource.*` policy holds on the FHIR surface too.
 async fn authorize_stored_write(
@@ -336,7 +336,7 @@ pub async fn create_fhir_patient(
 
 /// `PUT /fhir/Patient/{id}` — replace a person from a FHIR payload. The
 /// path id is authoritative. `200` updated; `400` invalid; `422` failed
-/// validation; `404` unknown; `403` refused on the stored record (SEC-G9).
+/// validation; `404` unknown; `403` refused on the stored record (SEC-G10).
 pub async fn update_fhir_patient(
     State(state): State<AppState>,
     Path(id): Path<String>,
@@ -386,7 +386,7 @@ pub async fn update_fhir_patient(
 }
 
 /// `DELETE /fhir/Patient/{id}` — soft-delete a person. `204` no body;
-/// `400` bad id; `404` unknown; `403` refused on the stored record (SEC-G9).
+/// `400` bad id; `404` unknown; `403` refused on the stored record (SEC-G10).
 pub async fn delete_fhir_patient(
     State(state): State<AppState>,
     Path(id): Path<String>,

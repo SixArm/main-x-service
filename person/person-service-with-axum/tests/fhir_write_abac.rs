@@ -1,4 +1,4 @@
-//! SEC-G9: FHIR writes take the record-level decision and the native
+//! SEC-G10: FHIR writes take the record-level decision and the native
 //! validation, as `PUT` / `DELETE /api/persons/{id}` and `POST` do. Its
 //! own binary: the policy is read once per process.
 
@@ -157,7 +157,7 @@ async fn del(state: &AppState, kid: &str, id: Uuid) -> (StatusCode, Value) {
     .await
 }
 
-/// SEC-G9: FHIR writes take the record-level decision and the native
+/// SEC-G10: FHIR writes take the record-level decision and the native
 /// validation, as the REST writes do. Without the fix a `PUT` on an
 /// inactive person returned `200` and changed it.
 #[tokio::test]

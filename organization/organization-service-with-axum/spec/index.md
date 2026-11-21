@@ -543,16 +543,16 @@ organization is not a data subject.
 
 ## 13. Tasks (live work queue)
 
-- [x] **2026-11-21 — SEC-G9: FHIR writes take the native validation.**
+- [x] **2026-11-21 — SEC-G10: FHIR writes take the native validation.**
       `POST` and `PUT /fhir/Organization` skipped `validation::problems`,
       which `POST` / `PUT /api/organizations` run, so a FHIR write
       bypassed the required-name and identifier rules and the SEC-M1
       input-size caps (a 5,000-character name was stored with `201`). A
       failure is now a `422` `processing` `OperationOutcome`, one issue per
-      problem. The record-level half of SEC-G9 does not apply here: this
+      problem. The record-level half of SEC-G10 does not apply here: this
       service takes the record-level decision on reads only (§6.3), so
       the FHIR writes already match the native ones. Repo `tasks.md`
-      SEC-G9.
+      SEC-G10.
 
 - [x] **ORG-T6 (S, security) — Record-level reads on the FHIR surface.**
   *(Found and done 2026-11-10, after ORG-T2.)* `GET /fhir/Organization/{id}`

@@ -9,7 +9,7 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
-### Fixed — FHIR writes take the record-level decision and validation (SEC-G9)
+### Fixed — FHIR writes take the record-level decision and validation (SEC-G10)
 
 - `PUT` and `DELETE /fhir/Task/{id}` skipped the record-level ABAC check
   the native writes run on the stored case, so a `resource.*` policy was

@@ -9,7 +9,7 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
-### Fixed — FHIR writes take the native validation (SEC-G9)
+### Fixed — FHIR writes take the native validation (SEC-G10)
 
 - `POST` and `PUT /fhir/Organization` skipped the validation the native
   writes run, including the SEC-M1 input-size caps. A failure is now a

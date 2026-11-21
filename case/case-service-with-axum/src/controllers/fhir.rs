@@ -168,7 +168,7 @@ fn validated(case: &Case) -> Result<(), Response> {
 }
 
 /// The record-level decision a write takes on the *stored* case, as `PUT`
-/// / `DELETE /api/cases/{pid}` take it (SEC-G9): without it a `resource.*`
+/// / `DELETE /api/cases/{pid}` take it (SEC-G10): without it a `resource.*`
 /// policy enforced on the native surface was bypassed here.
 #[allow(clippy::result_large_err)]
 fn authorized_write(caller: &MaybeAuthUser, action: Action, stored: &Case) -> Result<(), Response> {
