@@ -15,6 +15,15 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
   third byte panicked. It now compares by character. Not reachable from a
   request: no request path scores with this module since T-16.
 
+### Added — unit tests for search locations and date ranges
+
+- Every location kind is indexed (a place's name and city, a bare
+  address's city, a virtual venue's name, free text) and found by field,
+  since free-text search covers names, not locations, by design; a deleted
+  event is no longer found; the date range is inclusive at both ends with
+  either end open, and a malformed bound is an error (the module was 81%
+  covered).
+
 ### Added — unit tests for the matcher adapter
 
 - Every event type and status maps to the matcher's; identifier schemes

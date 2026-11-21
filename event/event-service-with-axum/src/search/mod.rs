@@ -566,4 +566,99 @@ mod tests {
         engine.reload().unwrap();
         assert_eq!(engine.stats().unwrap().num_docs, 3);
     }
+
+    /// Every location kind feeds the index: a place's name and city, a
+    /// bare address's city, a virtual venue's name, and free text. Free-text
+    /// search does not cover locations by design, so these are looked up by
+    /// field.
+    #[test]
+    fn locations_are_searchable() {
+        use crate::models::{Address, Location, Place, VirtualLocation};
+        let tmp = TempDir::new().unwrap();
+        let engine = SearchEngine::new(tmp.path()).unwrap();
+        let when = Utc.with_ymd_and_hms(2026, 3, 1, 9, 0, 0).unwrap();
+        let address = |city: &str| Address {
+            use_type: None,
+            line1: None,
+            line2: None,
+            city: Some(city.to_string()),
+            state: None,
+            postal_code: None,
+            country: Some("GB".to_string()),
+        };
+        let mut a = evt("First", when);
+        a.location = vec![Location::Place(Place {
+            id: None,
+            name: "Zephyrhall".to_string(),
+            address: Some(address("Aberystwyth")),
+            latitude_as_decimal_degrees: None,
+            longitude_as_decimal_degrees: None,
+            url: Some("https://hall.example".to_string()),
+        })];
+        let mut b = evt("Second", when);
+        b.location = vec![Location::PostalAddress(address("Llandudno"))];
+        let mut c = evt("Third", when);
+        c.location = vec![
+            Location::Virtual(VirtualLocation {
+                name: Some("Quokkastream".to_string()),
+                url: "https://v.example".to_string(),
+            }),
+            Location::Text {
+                value: "Marquee".to_string(),
+            },
+        ];
+        engine
+            .index_events(&[a.clone(), b.clone(), c.clone()])
+            .unwrap();
+        engine.reload().unwrap();
+        for (probe, want) in [
+            ("location_name:Zephyrhall", &a),
+            ("location_city:Aberystwyth", &a),
+            ("location_city:Llandudno", &b),
+            ("location_name:Quokkastream", &c),
+            ("location_name:Marquee", &c),
+        ] {
+            let ids = engine.search(probe, 10).unwrap();
+            assert!(ids.contains(&want.id.to_string()), "{probe}: {ids:?}");
+        }
+
+        engine.delete_event(&a.id.to_string()).unwrap();
+        engine.reload().unwrap();
+        assert!(
+            engine.search("location_name:Zephyrhall", 10).unwrap().is_empty(),
+            "a deleted event is not found"
+        );
+        engine.optimize().unwrap();
+    }
+
+    /// The date range is inclusive at both ends and either end may be open.
+    #[test]
+    fn date_range_search() {
+        let tmp = TempDir::new().unwrap();
+        let engine = SearchEngine::new(tmp.path()).unwrap();
+        let on = |d: u32| evt("Dated", Utc.with_ymd_and_hms(2026, 5, d, 9, 0, 0).unwrap());
+        let (early, middle, late) = (on(1), on(15), on(28));
+        engine
+            .index_events(&[early.clone(), middle.clone(), late.clone()])
+            .unwrap();
+        engine.reload().unwrap();
+        let found = |from, to| engine.search_by_date_range(from, to, 10).unwrap();
+        let only_middle = found(Some("2026-05-10"), Some("2026-05-20"));
+        assert_eq!(only_middle, vec![middle.id.to_string()]);
+        let from_middle = found(Some("2026-05-15"), None);
+        assert!(
+            from_middle.contains(&middle.id.to_string())
+                && from_middle.contains(&late.id.to_string())
+        );
+        assert!(!from_middle.contains(&early.id.to_string()));
+        let until_middle = found(None, Some("2026-05-15"));
+        assert!(
+            until_middle.contains(&early.id.to_string())
+                && !until_middle.contains(&late.id.to_string())
+        );
+        assert!(
+            engine.search_by_date_range(Some("[[["), None, 10).is_err(),
+            "a malformed bound is an error"
+        );
+    }
 }
