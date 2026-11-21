@@ -2604,13 +2604,15 @@
     unknown id from `500` into `404 not-found`). `tests/fhir_write_abac.rs`
     fails without the fix.
   - [x] person — fixed 2026-11-21, with validation. `tests/fhir_write_abac.rs`.
-  - [ ] organization — `controllers/fhir.rs` `update` / `remove`.
+  - [x] organization — not applicable: its record-level decision is on
+    reads only (spec §6.3), so FHIR writes already match REST. Its FHIR
+    create/update did skip validation; fixed 2026-11-21.
   - [ ] care-pathway — `controllers/fhir.rs` `update` / `remove`.
   - [x] case — fixed 2026-11-20; FHIR create and update also skipped
     validation (SEC-M1 caps), now applied. `tests/fhir_write_abac.rs`.
-  - [ ] **FHIR writes skip native validation** (SEC-M1 caps included) in
-    organization too; worker fixed 2026-11-20, case and person with their
-    SEC-G9 fixes; care-pathway already validates.
+  - [x] **FHIR writes skip native validation** (SEC-M1 caps included) in
+    worker, case, person and organization — all fixed 2026-11-20/21;
+    care-pathway already validated.
 - [x] **SEC-G9 (S) 🟠** Masking left emergency contacts' phone numbers
   whole. *(found and done 2026-11-09)* Person's and worker's
   `mask_person` / `mask_worker` mask the subject's phone, SMS and fax

@@ -144,6 +144,22 @@ pub struct FhirOperationOutcome {
 }
 
 impl FhirOperationOutcome {
+    /// Build an outcome with one `error` issue per message, all `code`.
+    #[must_use]
+    pub fn errors(code: &str, messages: &[String]) -> Self {
+        Self {
+            resource_type: "OperationOutcome".to_string(),
+            issue: messages
+                .iter()
+                .map(|m| FhirIssue {
+                    severity: "error".to_string(),
+                    code: code.to_string(),
+                    diagnostics: Some(m.clone()),
+                })
+                .collect(),
+        }
+    }
+
     /// Build an outcome carrying a single `error`-severity issue.
     #[must_use]
     pub fn error(code: &str, diagnostics: impl Into<String>) -> Self {

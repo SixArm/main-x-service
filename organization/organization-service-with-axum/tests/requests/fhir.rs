@@ -124,3 +124,39 @@ async fn fhir_search_by_id_alone_still_works() {
     })
     .await;
 }
+
+/// FHIR writes take the native validation (`fhir.md` §2): an over-long
+/// name, past the SEC-M1 cap, is a `422` `processing` outcome on create
+/// and update alike, as `POST` / `PUT /api/organizations` refuse it.
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with: cargo test -- --ignored"]
+async fn fhir_writes_take_the_native_validation() {
+    super::isolate_search_index();
+    request::<App, _, _>(|request, _ctx| async move {
+        let org = |name: &str| json!({ "resourceType": "Organization", "name": name });
+        let long = "x".repeat(5000);
+
+        let r = request.post("/fhir/Organization").json(&org(&long)).await;
+        assert_eq!(r.status_code(), 422, "{}", r.text());
+        let body: Value = serde_json::from_str(&r.text()).unwrap();
+        assert_eq!(body["resourceType"], "OperationOutcome");
+        assert_eq!(body["issue"][0]["code"], "processing");
+
+        let created = request
+            .post("/fhir/Organization")
+            .json(&org("Valid Ltd"))
+            .await;
+        assert_eq!(created.status_code(), 201, "{}", created.text());
+        let id = serde_json::from_str::<Value>(&created.text()).unwrap()["id"]
+            .as_str()
+            .unwrap()
+            .to_string();
+        let r = request
+            .put(&format!("/fhir/Organization/{id}"))
+            .json(&org(&long))
+            .await;
+        assert_eq!(r.status_code(), 422, "{}", r.text());
+    })
+    .await;
+}

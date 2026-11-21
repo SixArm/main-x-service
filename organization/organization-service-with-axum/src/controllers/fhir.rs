@@ -128,6 +128,20 @@ async fn read(
 /// `POST /fhir/Organization` — create from a FHIR `Organization` payload.
 /// `201` with the created resource + `Location`; `400` on unparseable or
 /// invalid FHIR. Audits + emits a `Created` event like the native path.
+/// The native validation a FHIR write must pass, as `POST` / `PUT
+/// /api/organizations` do (`agents/share/fhir.md` §2): each problem as one
+/// issue of a `422` `processing` outcome. Without it a FHIR write skipped
+/// the required-name and identifier rules and the SEC-M1 input-size caps.
+fn validation_refusal(org: &organization_matcher::Organization) -> Option<Response> {
+    let problems = crate::validation::problems(org);
+    (!problems.is_empty()).then(|| {
+        fhir_json(
+            StatusCode::UNPROCESSABLE_ENTITY,
+            &FhirOperationOutcome::errors("processing", &problems),
+        )
+    })
+}
+
 async fn create(
     State(ctx): State<AppContext>,
     caller: MaybeAuthUser,
@@ -147,6 +161,9 @@ async fn create(
         Ok(org) => org,
         Err(msg) => return fhir_error(StatusCode::BAD_REQUEST, "invalid", msg),
     };
+    if let Some(refused) = validation_refusal(&org) {
+        return refused;
+    }
     // Write + `Created` event, atomic under the active transport (shares
     // the native controller's transport-aware path).
     let model = match streaming::create_and_emit(&ctx.db, &org, caller.actor()).await {
@@ -200,6 +217,9 @@ async fn update(
         Ok(org) => org,
         Err(msg) => return fhir_error(StatusCode::BAD_REQUEST, "invalid", msg),
     };
+    if let Some(refused) = validation_refusal(&org) {
+        return refused;
+    }
     let Ok(model) = OrgModel::find_by_pid(&ctx.db, &id).await else {
         return fhir_error(
             StatusCode::NOT_FOUND,
