@@ -16,7 +16,7 @@ source of truth for that subproject; code conforms to the spec, not
 the reverse. Repository: https://github.com/SixArm/main-x-service and
 https://codeberg.org/SixArm/main-x-service (the same history, pushed
 to both). License: Rust crates `MIT OR Apache-2.0 OR BSD-3-Clause OR
-GPL-2.0-only OR GPL-3.0-only`; front-ends `MIT OR Apache-2.0` — see
+GPL-2.0-only OR GPL-3.0-only OR OGL-UK-3.0 OR CC-BY-NC-SA-4.0`; front-ends `MIT OR Apache-2.0` — see
 [LICENSE.md](LICENSE.md).
 
 ## Start here

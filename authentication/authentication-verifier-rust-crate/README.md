@@ -212,4 +212,4 @@ be compiled, let alone run, by CI.
 
 ## License
 
-MIT OR Apache-2.0 OR GPL-2.0 OR GPL-3.0 OR BSD-3-Clause
+MIT OR Apache-2.0 OR GPL-2.0 OR GPL-3.0 OR BSD-3-Clause OR OGL-UK-3.0 OR CC-BY-NC-SA-4.0

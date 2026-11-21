@@ -279,7 +279,7 @@ dependencies get no debug info at all.
 | PostgreSQL | 18+ |
 | Svelte / SvelteKit | 5 / 2 |
 | Service crate versions | per-crate (`person-service` 0.5.0, `organization-service` 0.1.0, …) |
-| License | dual / multi (MIT OR Apache-2.0, sometimes plus BSD-3-Clause / GPL) |
+| License | dual / multi (MIT OR Apache-2.0, sometimes plus BSD-3-Clause / GPL / OGL-UK-3.0 / CC-BY-NC-SA-4.0) |
 
 Crate versions are independent: each service, matcher, library, and
 front-end carries its own SemVer in its manifest.

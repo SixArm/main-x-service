@@ -189,4 +189,4 @@ detail.
 ## License
 
 Dual-licensed under MIT OR Apache-2.0 OR BSD-3-Clause OR GPL-2.0-only
-OR GPL-3.0-only.
+OR GPL-3.0-only OR OGL-UK-3.0 OR CC-BY-NC-SA-4.0.

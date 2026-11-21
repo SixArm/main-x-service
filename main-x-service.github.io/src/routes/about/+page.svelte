@@ -35,7 +35,7 @@
 <h2>License &amp; contact</h2>
 
 <ul>
-    <li>Rust crates: MIT OR Apache-2.0 OR BSD-3-Clause OR GPL-2.0-only OR GPL-3.0-only</li>
+    <li>Rust crates: MIT OR Apache-2.0 OR BSD-3-Clause OR GPL-2.0-only OR GPL-3.0-only OR OGL-UK-3.0 OR CC-BY-NC-SA-4.0</li>
     <li>Front-ends (including this site): MIT OR Apache-2.0</li>
     <li>Contact: Joel Parker Henderson (<a href="mailto:joel@joelparkerhenderson.com">joel@joelparkerhenderson.com</a>)</li>
 </ul>
