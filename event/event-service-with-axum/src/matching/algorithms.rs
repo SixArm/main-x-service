@@ -254,11 +254,19 @@ pub mod location_matching {
             (Some(x), Some(y)) => {
                 let x = x.trim().replace('-', "");
                 let y = y.trim().replace('-', "");
+                // Prefixes are compared by character: a byte slice such as
+                // `x[..5]` panics when a multi-byte character straddles
+                // the boundary, and a postal code is caller input.
+                let shares = |n: usize| {
+                    x.chars().count() >= n
+                        && y.chars().count() >= n
+                        && x.chars().take(n).eq(y.chars().take(n))
+                };
                 if x == y {
                     1.0
-                } else if x.len() >= 5 && y.len() >= 5 && x[..5] == y[..5] {
+                } else if shares(5) {
                     0.95
-                } else if x.len() >= 3 && y.len() >= 3 && x[..3] == y[..3] {
+                } else if shares(3) {
                     0.70
                 } else {
                     0.0
@@ -694,5 +702,275 @@ mod tests {
         let a = Identifier::new(IdentifierType::BookingNumber, "sys".into(), "X".into());
         let b = Identifier::new(IdentifierType::TicketNumber, "sys".into(), "X".into());
         assert!(identifier_matching::match_identifier(&a, &b).abs() < f64::EPSILON);
+    }
+
+    fn address(line1: &str, city: &str, state: &str, postal: &str) -> Address {
+        Address {
+            use_type: None,
+            line1: Some(line1.to_string()),
+            line2: None,
+            city: Some(city.to_string()),
+            state: Some(state.to_string()),
+            postal_code: Some(postal.to_string()),
+            country: Some("GB".to_string()),
+        }
+    }
+
+    fn place(
+        id: Option<uuid::Uuid>,
+        name: &str,
+        addr: Option<Address>,
+        geo: Option<(&str, &str)>,
+    ) -> Place {
+        Place {
+            id,
+            name: name.to_string(),
+            address: addr,
+            latitude_as_decimal_degrees: geo.map(|(la, _)| la.parse().unwrap()),
+            longitude_as_decimal_degrees: geo.map(|(_, lo)| lo.parse().unwrap()),
+            url: None,
+        }
+    }
+
+    fn approx(a: f64, b: f64) -> bool {
+        (a - b).abs() < 1e-9
+    }
+
+    /// Every variant pairing: a shared external place id short-circuits;
+    /// otherwise name, address and coordinates combine; a place is compared
+    /// to a bare address through its own; virtual locations compare URLs
+    /// without case; text compares as titles; any other pairing is `0`.
+    #[test]
+    #[allow(clippy::many_single_char_names)]
+    fn locations_score_by_variant() {
+        use crate::models::VirtualLocation;
+        use location_matching::{match_location, match_locations};
+        let id = uuid::Uuid::new_v4();
+        let hall = address("1 Hall Road", "Cardiff", "Wales", "CF10 1AA");
+        let a = Location::Place(place(Some(id), "City Hall", None, None));
+        let b = Location::Place(place(Some(id), "Different", None, None));
+        assert!(approx(match_location(&a, &b), 1.0), "shared id");
+
+        let near = Location::Place(place(
+            None,
+            "City Hall",
+            Some(hall.clone()),
+            Some(("51.4816", "-3.1791")),
+        ));
+        let same = Location::Place(place(
+            None,
+            "City Hall",
+            Some(hall.clone()),
+            Some(("51.4816", "-3.1791")),
+        ));
+        assert!(
+            match_location(&near, &same) > 0.99,
+            "same name, address and point"
+        );
+        let bare = Location::Place(place(None, "City Hall", None, None));
+        let s = match_location(&near, &bare);
+        assert!(s > 0.39 && s < 0.41, "name only counts 0.4: {s}");
+
+        let postal = Location::PostalAddress(hall.clone());
+        assert!(approx(match_location(&postal, &postal.clone()), 1.0));
+        assert!(
+            approx(match_location(&near, &postal), 1.0),
+            "place vs its own address"
+        );
+        assert!(
+            approx(match_location(&postal, &bare), 0.0),
+            "a place with no address"
+        );
+
+        let v = |u: &str| {
+            Location::Virtual(VirtualLocation {
+                name: None,
+                url: u.to_string(),
+            })
+        };
+        assert!(approx(
+            match_location(&v("https://x.test/Live"), &v(" https://X.TEST/live ")),
+            1.0
+        ));
+        assert!(approx(
+            match_location(&v("https://x.test/a"), &v("https://x.test/b")),
+            0.0
+        ));
+        let t = |x: &str| Location::Text {
+            value: x.to_string(),
+        };
+        assert!(match_location(&t("Main stage"), &t("Main stage")) > 0.99);
+        assert!(
+            approx(match_location(&t("Main stage"), &postal), 0.0),
+            "cross-variant"
+        );
+
+        assert!(approx(
+            match_locations(&[], std::slice::from_ref(&postal)),
+            0.0
+        ));
+        assert!(
+            approx(
+                match_locations(&[t("Elsewhere"), postal.clone()], &[postal]),
+                1.0
+            ),
+            "best pair wins"
+        );
+    }
+
+    /// Postal codes: exact (ignoring hyphens), a shared five-character or
+    /// three-character prefix, or nothing.
+    #[test]
+    fn postal_codes_score_by_prefix() {
+        use location_matching::match_address;
+        let with = |p: &str| address("", "", "", p);
+        let postal_only = |a: &str, b: &str| {
+            let mut x = with(a);
+            let mut y = with(b);
+            for v in [&mut x, &mut y] {
+                v.line1 = None;
+                v.city = None;
+                v.state = None;
+            }
+            match_address(&x, &y) / 0.30
+        };
+        assert!(approx(postal_only("12345-6789", "123456789"), 1.0));
+        assert!(approx(postal_only("12345-1111", "12345-2222"), 0.95));
+        assert!(approx(postal_only("12399", "12311"), 0.70));
+        assert!(approx(postal_only("99999", "11111"), 0.0));
+    }
+
+    /// A postal code is caller input. A multi-byte character at the
+    /// five- or three-byte boundary must score, not panic.
+    #[test]
+    #[allow(clippy::many_single_char_names)]
+    fn postal_codes_with_multibyte_characters_do_not_panic() {
+        use location_matching::match_address;
+        let a = address("", "", "", "1234é5");
+        let b = address("", "", "", "1234ü5");
+        let s = match_address(&a, &b);
+        assert!(s.is_finite());
+        let c = address("", "", "", "aé");
+        let d = address("", "", "", "aü");
+        assert!(match_address(&c, &d).is_finite());
+    }
+
+    /// Coordinates a kilometre apart score below the same point and above
+    /// ones a hundred kilometres apart.
+    #[test]
+    fn geo_proximity_decays_with_distance() {
+        use location_matching::match_location;
+        let at = |la: &str, lo: &str| Location::Place(place(None, "X", None, Some((la, lo))));
+        let here = at("51.4816", "-3.1791");
+        let km = match_location(&here, &at("51.4906", "-3.1791"));
+        let far = match_location(&here, &at("52.4816", "-3.1791"));
+        let same = match_location(&here, &here.clone());
+        assert!(same > km && km > far, "{same} > {km} > {far}");
+    }
+
+    /// Parties of different kinds never match; a shared id or email is
+    /// decisive; otherwise names compare.
+    #[test]
+    fn parties_identifiers_and_references() {
+        use crate::models::{IdentifierType, PartyKind};
+        use identifier_matching::match_identifiers;
+        use party_matching::match_parties;
+        use reference_matching::match_references;
+        let party =
+            |kind: PartyKind, id: Option<uuid::Uuid>, name: &str, email: Option<&str>| Party {
+                kind,
+                id,
+                name: name.to_string(),
+                email: email.map(str::to_string),
+                url: None,
+            };
+        let id = uuid::Uuid::new_v4();
+        let ada = party(PartyKind::Person, Some(id), "Ada", None);
+        assert!(
+            approx(
+                match_parties(
+                    std::slice::from_ref(&ada),
+                    &[party(PartyKind::Organization, Some(id), "Ada", None)]
+                ),
+                0.0
+            ),
+            "kind"
+        );
+        assert!(
+            approx(
+                match_parties(
+                    std::slice::from_ref(&ada),
+                    &[party(PartyKind::Person, Some(id), "Other", None)]
+                ),
+                1.0
+            ),
+            "id"
+        );
+        let mail = |name: &str| party(PartyKind::Person, None, name, Some("A@Example.test"));
+        assert!(
+            approx(match_parties(&[mail("Ada")], &[mail("Zed")]), 1.0),
+            "email without case"
+        );
+        assert!(approx(match_parties(&[], &[ada]), 0.0));
+
+        let ident = |t: IdentifierType, sys: &str, v: &str| {
+            Identifier::new(t, sys.to_string(), v.to_string())
+        };
+        let a = ident(IdentifierType::BookingNumber, "sys", "AB-12 34");
+        assert!(approx(
+            match_identifiers(
+                std::slice::from_ref(&a),
+                &[ident(IdentifierType::BookingNumber, "sys", " ab-12 34 ")]
+            ),
+            1.0
+        ));
+        assert!(approx(
+            match_identifiers(
+                std::slice::from_ref(&a),
+                &[ident(IdentifierType::BookingNumber, "sys", "ab1234")]
+            ),
+            0.98
+        ));
+        assert!(
+            approx(
+                match_identifiers(
+                    std::slice::from_ref(&a),
+                    &[ident(IdentifierType::BookingNumber, "other", "AB-12 34")]
+                ),
+                0.0
+            ),
+            "system"
+        );
+        assert!(approx(
+            match_identifiers(
+                std::slice::from_ref(&a),
+                &[ident(IdentifierType::BookingNumber, "sys", "ZZ")]
+            ),
+            0.0
+        ));
+        assert!(approx(match_identifiers(&[], &[a]), 0.0));
+
+        let r = |id: Option<uuid::Uuid>, name: &str| Reference {
+            id,
+            name: name.to_string(),
+            url: None,
+            kind: None,
+        };
+        assert!(approx(
+            match_references(&[r(Some(id), "X")], &[r(Some(id), "Y")]),
+            1.0
+        ));
+        assert!(match_references(&[r(None, "Hamlet")], &[r(None, "Hamlet")]) > 0.99);
+        assert!(approx(match_references(&[], &[r(None, "Hamlet")]), 0.0));
+    }
+
+    /// End dates: both unknown is neutral, one unknown is no evidence of a
+    /// match, both known compare like start dates.
+    #[test]
+    fn end_dates_handle_unknowns() {
+        use time_matching::match_end_dates;
+        assert!(approx(match_end_dates(None, None), 0.5));
+        assert!(approx(match_end_dates(Some(dt(2026, 3, 1, 9)), None), 0.0));
+        assert!(match_end_dates(Some(dt(2026, 3, 1, 9)), Some(dt(2026, 3, 1, 9))) > 0.99);
     }
 }

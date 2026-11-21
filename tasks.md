@@ -6302,6 +6302,18 @@ running one.
   fail without the fix. Event, place and thing carried the same nanosecond `convert.rs`
   with no caller input reaching it; they took the same rewrite and test
   the same day, before one could.
+- [x] **SEC-M11 (S, not request-reachable)** A multi-byte postal code
+  panicked event's address scorer. *(found and done 2026-11-21, raising
+  event-service coverage)* `matching::algorithms::location_matching`
+  compared postal-code prefixes with byte slices (`x[..5]`, `x[..3]`), so
+  `"1234é5"` against `"1234ü5"` panicked inside `'é'` (invariant 2). The
+  module's own docs say no request path scores with it since T-16 (the
+  embedded `event-matcher` scores instead), so this was reachable only
+  through the public library API and the benches. Prefixes now compare by
+  character; a unit test fails without the fix. A tree-wide search for
+  byte-index string slices found no other case on caller text: the rest
+  slice strings already reduced to ASCII digits, or follow an ASCII
+  separator.
 - [x] **DOC-9 (M)** The agents directory name is lowercase.
   *(done 2026-08-21)* Git tracked the agent reference docs under an
   uppercase directory while **878 files referenced the lowercase

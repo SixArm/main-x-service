@@ -8,6 +8,19 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ## [Unreleased]
 
+### Fixed — a multi-byte postal code no longer panics the address scorer (SEC-M11)
+
+- `matching::algorithms::location_matching::match_address` compared
+  postal-code prefixes by byte, so a multi-byte character at the fifth or
+  third byte panicked. It now compares by character. Not reachable from a
+  request: no request path scores with this module since T-16.
+
+### Added — unit tests for the standalone matching algorithms
+
+- Every location variant pairing, postal-code prefixes, geo proximity,
+  parties, identifiers, references and end dates (the module was 69%
+  covered).
+
 ### Fixed — an update does not bring a deleted record back (SEC-B13)
 
 - `PUT /api/events/{id}` on a soft-deleted record answered `200` and the
