@@ -2606,8 +2606,10 @@
   - [ ] person — `update_fhir_patient` / `delete_fhir_patient`.
   - [ ] organization — `controllers/fhir.rs` `update` / `remove`.
   - [ ] care-pathway — `controllers/fhir.rs` `update` / `remove`.
-  - [ ] case — `controllers/fhir.rs` `update` / `remove` (highest
-    sensitivity: `subject_of`).
+  - [x] case — fixed 2026-11-20; FHIR create and update also skipped
+    validation (SEC-M1 caps), now applied. `tests/fhir_write_abac.rs`.
+  - [ ] **Also check** person, organization and care-pathway FHIR create
+    and update for the same missing validation.
 - [x] **SEC-G9 (S) 🟠** Masking left emergency contacts' phone numbers
   whole. *(found and done 2026-11-09)* Person's and worker's
   `mask_person` / `mask_worker` mask the subject's phone, SMS and fax

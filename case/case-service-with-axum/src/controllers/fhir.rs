@@ -38,6 +38,7 @@ use axum::{
 use serde::Serialize;
 
 use authentication_verifier::Action;
+use case_matcher::Case;
 
 use crate::auth::MaybeAuthUser;
 use crate::controllers::cases::mask_case;
@@ -149,6 +150,40 @@ async fn read(
 /// `POST /fhir/Task` — create from a FHIR `Task` payload. `201` with the
 /// created resource + `Location`; `400` on unparseable or invalid FHIR.
 /// Audits + emits a `Created` event like the native path.
+/// The native validation a FHIR write must pass, as `POST` / `PUT
+/// /api/cases` do (`agents/share/fhir.md` §2): every problem, one issue
+/// each, as a `422` `processing` outcome. Without it a FHIR write skipped
+/// the required-field rules and the SEC-M1 input-size caps.
+#[allow(clippy::result_large_err)]
+fn validated(case: &Case) -> Result<(), Response> {
+    let problems = crate::validation::problems(case);
+    if problems.is_empty() {
+        Ok(())
+    } else {
+        Err(fhir_json(
+            StatusCode::UNPROCESSABLE_ENTITY,
+            &FhirOperationOutcome::errors("processing", &problems),
+        ))
+    }
+}
+
+/// The record-level decision a write takes on the *stored* case, as `PUT`
+/// / `DELETE /api/cases/{pid}` take it (SEC-G9): without it a `resource.*`
+/// policy enforced on the native surface was bypassed here.
+#[allow(clippy::result_large_err)]
+fn authorized_write(caller: &MaybeAuthUser, action: Action, stored: &Case) -> Result<(), Response> {
+    crate::auth::authorize_record(caller, action, &crate::auth::case_resource_attrs(stored))
+        .map(|_| ())
+        .map_err(|(status, reason)| {
+            let code = if status == StatusCode::FORBIDDEN {
+                "forbidden"
+            } else {
+                "login"
+            };
+            fhir_error(status, code, reason)
+        })
+}
+
 async fn create(
     State(ctx): State<AppContext>,
     caller: MaybeAuthUser,
@@ -168,6 +203,9 @@ async fn create(
         Ok(case) => case,
         Err(msg) => return fhir_error(StatusCode::BAD_REQUEST, "invalid", msg),
     };
+    if let Err(refused) = validated(&case) {
+        return refused;
+    }
     // Write + emit atomically under the active transport (shared with the
     // native controller, so FHIR need not know the transport).
     let model = match streaming::create_and_emit(&ctx.db, &case, caller.actor()).await {
@@ -218,6 +256,9 @@ async fn update(
         Ok(case) => case,
         Err(msg) => return fhir_error(StatusCode::BAD_REQUEST, "invalid", msg),
     };
+    if let Err(refused) = validated(&case) {
+        return refused;
+    }
     let Ok(model) = CaseModel::find_by_pid(&ctx.db, &id).await else {
         return fhir_error(
             StatusCode::NOT_FOUND,
@@ -225,6 +266,19 @@ async fn update(
             format!("Task/{id} not found"),
         );
     };
+    let stored = match model.to_case() {
+        Ok(stored) => stored,
+        Err(e) => {
+            return fhir_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "exception",
+                e.to_string(),
+            );
+        }
+    };
+    if let Err(refused) = authorized_write(&caller, Action::Write, &stored) {
+        return refused;
+    }
     let updated = match streaming::update_and_emit(&ctx.db, model, &case, caller.actor()).await {
         Ok(m) => m,
         Err(e) => {
@@ -259,6 +313,19 @@ async fn remove(
             format!("Task/{id} not found"),
         );
     };
+    let stored = match model.to_case() {
+        Ok(stored) => stored,
+        Err(e) => {
+            return fhir_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "exception",
+                e.to_string(),
+            );
+        }
+    };
+    if let Err(refused) = authorized_write(&caller, Action::Delete, &stored) {
+        return refused;
+    }
     // Audit is written by `streaming::delete_and_emit` (see `create`).
     if let Err(e) = streaming::delete_and_emit(&ctx.db, model, caller.actor()).await {
         return fhir_error(

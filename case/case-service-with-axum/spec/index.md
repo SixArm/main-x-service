@@ -911,6 +911,18 @@ the other v1 edge kinds even though it shares the same edge shape.
 
 ## 13. Tasks (live work queue)
 
+- [x] **2026-11-20 — SEC-G9: FHIR writes take the record-level decision and validation.**
+      `PUT` and `DELETE /fhir/Task/{id}` loaded the case but skipped the
+      `authorize_record` check `PUT` / `DELETE /api/cases/{pid}` run on the
+      stored case, so a `resource.*` policy (e.g. no writes to a closed
+      case) was bypassed through FHIR; and FHIR create and update skipped
+      `validation::problems`, including the SEC-M1 input-size caps. Both
+      now match the native surface: a refusal is a FHIR `OperationOutcome`
+      (`403` / `401`), and validation failures are a `422` `processing`
+      outcome with one issue per problem. `tests/fhir_write_abac.rs` fails
+      without the fix (a closed case was rewritten with `200`). Repo
+      `tasks.md` SEC-G9.
+
 - [x] **CS-FH1 (S, security) — Masked readers cannot search on hidden values.**
   *(Done 2026-11-10; found by the survey after organization ORG-T6.)*
   A caller who may read a case only masked could still learn a value
