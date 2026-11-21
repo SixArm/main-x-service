@@ -9,6 +9,19 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — FHIR Basic and relay drain tests
+
+- `tests/fhir_crud.rs`, the crate's first FHIR request tests (the
+  controller was 29% covered with the DB suite): the `CapabilityStatement`;
+  a `Basic` course create → read → `_id` search → update → delete →
+  `404`; a non-JSON body on create and update and a `Basic` with no course
+  name are client-error `OperationOutcome`s; a 5000-character name is
+  `422` on create and refused on update (the native validation applies);
+  an unknown id is `404` on read, update and delete.
+- `tests/relay_drain.rs`: a failing sink publishes nothing, a working one
+  stamps `published_at` without resending, and the retention purge removes
+  published rows; no broker needed.
+
 ### Changed — axa 0.11
 
 - `axa` 0.10 → 0.11 and `axa-test` 0.1 → 0.2. **Deploy settings change before
