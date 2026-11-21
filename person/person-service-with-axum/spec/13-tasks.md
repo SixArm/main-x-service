@@ -1,5 +1,7 @@
 ## 13. Tasks
 
+- [x] **A merge no longer doubles a shared address.** *(done 2026-11-21)* The merge copied every address of the duplicate although its comment said "not already present", so the survivor held a shared address twice. A held address is now skipped; a unit test in `src/api/rest/handlers.rs` fails without the fix.
+
 - [x] **SEC-M10 — a far-future `since` no longer panics.** *(done 2026-11-21)* `GET /api/persons/links?since=2999-…` panicked into a `500` through an `i64`-nanosecond conversion that ends in 2262. `db/convert.rs` now converts through seconds and the sub-second part; caller input is fallible (`422` out of range). `tests/bulk_links_since.rs` fails without the fix. Repo `tasks.md` SEC-M10.
 
 - [x] **SEC-G10 — FHIR writes take the record-level decision and validation.** *(done 2026-11-21)* `PUT` and `DELETE /fhir/Patient/{id}` now load the stored person and run `authorize_record` on it, as the REST writes do, so a `resource.*` policy cannot be bypassed through FHIR; an unknown id is `404 not-found`. FHIR create and update now run `validate_person` (including the SEC-M1 caps), answering a `422` `processing` outcome with one issue per problem. `tests/fhir_write_abac.rs` fails without the fix: an inactive person was rewritten with `200`. Repo `tasks.md` SEC-G10.

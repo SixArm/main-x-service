@@ -1082,9 +1082,19 @@ fn merge_duplicate_into_main(
     dup_name.use_type = Some(crate::models::NameUse::Old);
     merged.additional_names.push(dup_name);
 
-    // Transfer addresses not already present
+    // Transfer addresses not already present. An address both records
+    // hold was pushed again, so every merge of two people at one address
+    // left the survivor holding it twice; `Address` has no `PartialEq`, so
+    // they are compared as serialized.
     for addr in &duplicate.addresses {
-        merged.addresses.push(addr.clone());
+        let held = serde_json::to_value(addr).ok();
+        if !merged
+            .addresses
+            .iter()
+            .any(|existing| serde_json::to_value(existing).ok() == held)
+        {
+            merged.addresses.push(addr.clone());
+        }
     }
 
     // Transfer contacts
@@ -2541,6 +2551,54 @@ mod tests {
         assert_eq!(
             search_result_disposition(Some(&other), false),
             ResultDisposition::Full
+        );
+    }
+}
+
+#[cfg(test)]
+mod merge_transfer_tests {
+    use super::merge_duplicate_into_main;
+    use crate::models::{Address, Gender, HumanName, Person};
+
+    fn person(family: &str) -> Person {
+        Person::new(
+            HumanName {
+                use_type: None,
+                family: family.into(),
+                given: vec!["A".into()],
+                prefix: vec![],
+                suffix: vec![],
+            },
+            Gender::Female,
+        )
+    }
+
+    fn at(line1: &str) -> Address {
+        Address {
+            use_type: None,
+            line1: Some(line1.into()),
+            line2: None,
+            city: Some("York".into()),
+            state: None,
+            postal_code: None,
+            country: Some("GB".into()),
+        }
+    }
+
+    /// An address both records hold is kept once; a new one is carried.
+    #[test]
+    fn a_shared_address_is_not_doubled() {
+        let mut main = person("Main");
+        main.addresses = vec![at("1 Shared Street")];
+        let mut dup = person("Dup");
+        dup.addresses = vec![at("1 Shared Street"), at("2 New Street")];
+        let (merged, _) = merge_duplicate_into_main(&main, &dup);
+        assert_eq!(merged.addresses.len(), 2, "{:?}", merged.addresses);
+        assert!(
+            merged
+                .addresses
+                .iter()
+                .any(|a| a.line1.as_deref() == Some("2 New Street"))
         );
     }
 }

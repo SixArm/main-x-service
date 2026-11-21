@@ -1094,9 +1094,19 @@ fn transfer_worker_data(
     dup_name.use_type = Some(crate::models::NameUse::Old);
     merged.additional_names.push(dup_name);
 
-    // Transfer addresses not already present
+    // Transfer addresses not already present. An address both records
+    // hold was pushed again, so every merge of two people at one address
+    // left the survivor holding it twice; `Address` has no `PartialEq`, so
+    // they are compared as serialized.
     for addr in &duplicate.addresses {
-        merged.addresses.push(addr.clone());
+        let held = serde_json::to_value(addr).ok();
+        if !merged
+            .addresses
+            .iter()
+            .any(|existing| serde_json::to_value(existing).ok() == held)
+        {
+            merged.addresses.push(addr.clone());
+        }
     }
 
     // Transfer contacts
@@ -2486,5 +2496,117 @@ mod sec_g3_tests {
             readable_candidates(vec![worker("A"), worker("B")], |_| Some(vec![]));
         assert_eq!(kept.len(), 2);
         assert!(masked_ids.is_empty());
+    }
+}
+
+#[cfg(test)]
+mod transfer_tests {
+    use super::transfer_worker_data;
+    use crate::models::{
+        ContactPoint, ContactPointSystem, DocumentType, EmergencyContact, Gender, HumanName,
+        Identifier, IdentifierType, IdentityDocument, NameUse, Worker,
+    };
+
+    fn name(family: &str) -> HumanName {
+        HumanName {
+            use_type: None,
+            family: family.into(),
+            given: vec!["A".into()],
+            prefix: vec![],
+            suffix: vec![],
+        }
+    }
+
+    fn doc(number: &str) -> IdentityDocument {
+        IdentityDocument {
+            document_type: DocumentType::Passport,
+            number: number.into(),
+            issuing_country: None,
+            issuing_authority: None,
+            issue_date: None,
+            expiry_date: None,
+            verified: false,
+        }
+    }
+
+    fn contact(name: &str) -> EmergencyContact {
+        EmergencyContact {
+            name: name.into(),
+            relationship: "sibling".into(),
+            telecom: vec![],
+            address: None,
+            is_primary: false,
+        }
+    }
+
+    fn phone(v: &str) -> ContactPoint {
+        ContactPoint {
+            system: ContactPointSystem::Phone,
+            value: v.into(),
+            use_type: None,
+        }
+    }
+
+    /// A merge carries across what the survivor lacks and skips what it
+    /// already holds, records the identifiers and tax id it moved, keeps the
+    /// duplicate's name as an old alias, and links the survivor to it.
+    #[test]
+    fn transfer_moves_only_what_the_survivor_lacks() {
+        let shared_id = Identifier::new(IdentifierType::SSN, "urn:ssn".into(), "111".into());
+        let mut main = Worker::new(name("Main"), Gender::Female);
+        main.identifiers = vec![shared_id.clone()];
+        main.telecom = vec![phone("0100")];
+        main.documents = vec![doc("P1")];
+        main.emergency_contacts = vec![contact("Bea")];
+
+        let mut dup = Worker::new(name("Dup"), Gender::Female);
+        dup.identifiers = vec![
+            shared_id,
+            Identifier::new(IdentifierType::SSN, "urn:ssn".into(), "222".into()),
+        ];
+        dup.additional_names = vec![name("Alias")];
+        dup.telecom = vec![phone("0100"), phone("0200")];
+        dup.documents = vec![doc("P1"), doc("P2")];
+        dup.emergency_contacts = vec![contact("Bea"), contact("Cal")];
+        dup.tax_id = Some("TAX-9".into());
+        let at = |line1: &str| crate::models::Address {
+            use_type: None,
+            line1: Some(line1.into()),
+            line2: None,
+            city: Some("York".into()),
+            state: None,
+            postal_code: None,
+            country: Some("GB".into()),
+        };
+        main.addresses = vec![at("1 Shared Street")];
+        dup.addresses = vec![at("1 Shared Street"), at("2 New Street")];
+
+        let (merged, transferred) = transfer_worker_data(&main, &dup);
+        assert_eq!(
+            merged.identifiers.len(),
+            2,
+            "the shared identifier is not doubled"
+        );
+        assert_eq!(merged.telecom.len(), 2);
+        assert_eq!(merged.documents.len(), 2);
+        assert_eq!(merged.emergency_contacts.len(), 2);
+        assert_eq!(merged.addresses.len(), 2, "a shared address is not doubled");
+        assert_eq!(merged.tax_id.as_deref(), Some("TAX-9"));
+        assert!(merged.additional_names.iter().any(|n| n.family == "Alias"));
+        assert!(
+            merged
+                .additional_names
+                .iter()
+                .any(|n| n.family == "Dup" && matches!(n.use_type, Some(NameUse::Old)))
+        );
+        assert!(merged.links.iter().any(|l| l.other_worker_id == dup.id));
+        assert_eq!(transferred["identifiers"].as_array().map(Vec::len), Some(1));
+        assert_eq!(transferred["tax_id"], "TAX-9");
+
+        // A survivor's own tax id is kept, and nothing is recorded as moved.
+        main.tax_id = Some("TAX-1".into());
+        let (merged, transferred) = transfer_worker_data(&main, &dup);
+        assert_eq!(merged.tax_id.as_deref(), Some("TAX-1"));
+        assert!(!transferred.contains_key("tax_id"));
     }
 }

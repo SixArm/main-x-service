@@ -8,6 +8,13 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ## [Unreleased]
 
+### Fixed — a merge no longer doubles a shared address
+
+- The merge's address transfer, commented "not already present", pushed
+  every address of the duplicate, so merging two records at one address
+  left the survivor holding it twice. A held address is now skipped
+  (compared as serialized, since `Address` has no `PartialEq`).
+
 ### Added — FHIR conversion unit tests
 
 - The module had none. The same person serves as `Patient` and as the

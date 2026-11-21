@@ -8,6 +8,21 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ## [Unreleased]
 
+### Fixed — a merge no longer doubles a shared address
+
+- The merge's address transfer, commented "not already present", pushed
+  every address of the duplicate, so merging two records at one address
+  left the survivor holding it twice. A held address is now skipped
+  (compared as serialized, since `Address` has no `PartialEq`).
+
+### Added — merge transfer unit tests
+
+- `transfer_worker_data` carries across what the survivor lacks and skips
+  what it already holds (identifiers, contacts, documents, emergency
+  contacts, addresses), records the identifiers and tax id it moved, keeps
+  a survivor's own tax id, keeps the duplicate's name as an old alias, and
+  links the survivor to it.
+
 ### Added — relay drain and FHIR conversion tests
 
 - `tests/relay_drain.rs`, ported from person: a failing sink publishes
