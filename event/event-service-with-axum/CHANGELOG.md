@@ -8,6 +8,21 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ## [Unreleased]
 
+### Fixed — an update does not bring a deleted record back (SEC-B13)
+
+- `PUT /api/events/{id}` on a soft-deleted record answered `200` and the
+  record was served again, its deletion undone with no audit row or event. Updating an unknown id was a `500`.
+  It is now `404`, and the deletion columns come from the stored row.
+
+### Added — HTTP tests for search, match, update, merge and audit
+
+- `tests/handlers_http.rs`: search finds and match scores a created event;
+  an update is stored; masked view, per-event, recent and per-user audit,
+  both integrity verifiers and batch deduplication answer; a merge retires
+  the duplicate and refuses a self-merge or an unknown side; every
+  single-event endpoint is `404` for an unknown id. Writing it found
+  SEC-B13.
+
 ### Fixed — a repeat delete is `404` and keeps the deletion time (SEC-B12)
 
 - `DELETE /api/events/{id}` on an already-deleted record answered `204`,

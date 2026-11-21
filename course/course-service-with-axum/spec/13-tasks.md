@@ -1,5 +1,6 @@
 ## 13. Tasks
 
+- [x] **SEC-B13 — an update does not bring a deleted record back.** *(done 2026-11-21)* `PUT /api/courses/{id}` on a deleted record answered `200` and it was served again; it is now `404`, and the deletion columns come from the stored row, not the request. `tests/delete_twice.rs` fails without the fix. Repo `tasks.md` SEC-B13.
 - [x] **An instance created with the nil id no longer blocks the next one.** *(done 2026-11-21)* `POST /api/courses/{id}/instances` stored a client-sent all-zeros `id` verbatim, so the first such instance took the nil id and every later one, under any course, was a `500` on the primary key; course create already minted a fresh id for the nil sentinel, and instance create now does the same. `tests/instances_http.rs` fails without the fix; `instance_subresource_round_trips` had passed only on a fresh database.
 - [x] **SEC-B12 — a repeat delete is `404`.** *(done 2026-11-21)* `DELETE /api/courses/{id}` on an unknown or already-deleted record answered `204`, re-stamped `deleted_at` and emitted another `deleted` event. It is now `404` and the stored deletion time is kept. `tests/delete_twice.rs` fails without the fix. Repo `tasks.md` SEC-B12.
 - [x] **SEC-M1 (security): input-size caps on the `Course` payload.**

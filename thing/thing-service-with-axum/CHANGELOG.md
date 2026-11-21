@@ -8,6 +8,12 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ## [Unreleased]
 
+### Fixed — an update does not bring a deleted record back (SEC-B13)
+
+- `PUT /api/things/{id}` on a soft-deleted record answered `200` and the
+  record was served again, its deletion undone with no audit row or event. A `PUT` with `"is_deleted": true` also deleted a thing past the delete path's audit and event.
+  It is now `404`, and the deletion columns come from the stored row.
+
 ### Added — HTTP tests for merge, delete, review decisions and 404s
 
 - `tests/handlers_http.rs`, ported from place: a merge retires the

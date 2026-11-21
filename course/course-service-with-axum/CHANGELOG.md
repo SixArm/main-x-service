@@ -9,6 +9,12 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Fixed — an update does not bring a deleted record back (SEC-B13)
+
+- `PUT /api/courses/{id}` on a soft-deleted record answered `200` and the
+  record was served again, its deletion undone with no audit row or event. `created_at` also came from the request; it is now kept. The SEC-B12 check no longer treats an inactive course as deleted.
+  It is now `404`, and the deletion columns come from the stored row.
+
 ### Fixed — an instance created with the nil id no longer blocks the next
 
 - `POST /api/courses/{id}/instances` stored a client-sent all-zeros `id`

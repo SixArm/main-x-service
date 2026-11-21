@@ -224,6 +224,7 @@ pub async fn get_event(State(state): State<AppState>, Path(id): Path<Uuid>) -> i
     request_body = Event,
     responses(
         (status = 200, description = "Event updated"),
+        (status = 404, description = "No such event, or it is deleted"),
         (status = 422, description = "Validation error")
     )
 )]
@@ -266,6 +267,9 @@ pub async fn update_event(
                 tracing::warn!("Failed to update event in search index: {}", e);
             }
             ok(StatusCode::OK, event)
+        }
+        Err(crate::Error::EventNotFound(_)) => {
+            ApiProblem::new("not_found", "Event not found").respond(StatusCode::NOT_FOUND)
         }
         Err(e) => ApiProblem::new("database_error", format!("Failed to update event: {e}"))
             .respond(StatusCode::INTERNAL_SERVER_ERROR),

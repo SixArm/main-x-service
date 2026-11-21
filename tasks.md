@@ -2852,6 +2852,22 @@
   checks the status and the stored timestamp, and fails without the fix.
   Person and worker check existence in their handlers and were not
   affected.
+- [x] **SEC-B13 (S)** An update brought a deleted record back. *(found
+  and done 2026-11-21, writing event-service's handler tests)* In place,
+  thing and course the update wrote the deletion columns from the request
+  body (`is_deleted`, `deleted_at`; course also `created_at`), and
+  event's row builder wrote `deleted_at = NULL`. So `PUT` on a
+  soft-deleted record answered `200` and it was served again, its
+  deletion undone with no audit row or event saying so; in place and
+  thing the same `PUT` with `"is_deleted": true` deleted a record past the
+  delete path's audit and event. Event's update of an unknown id was a
+  `500`. All four now answer `404` for an unknown or deleted record and
+  take the deletion columns (and course's `created_at`) from the stored
+  row. `an_update_does_not_bring_a_deleted_record_back` in each crate's
+  `tests/delete_twice.rs` fails without the fix. Person, worker and the
+  controller-style services look the record up first and were not
+  affected. Also corrected the SEC-B12 course check, which wrongly treated
+  an inactive course as deleted.
 - [x] **SEC-M1 (M) 🟠** Input-size caps. *(case + care-pathway + portfolio
   validators done 2026-07-13; `limit_payload` backstop + a broken-production-config
   sweep done 2026-08-02)* Per-field length + array-cardinality caps in

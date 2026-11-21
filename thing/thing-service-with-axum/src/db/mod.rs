@@ -338,14 +338,21 @@ impl ThingRepository for PgThingRepository {
     /// Returns [`crate::Error::NotFound`] if no row has this id, or
     /// [`crate::Error::Database`] on any DB failure.
     async fn update(&self, thing: &Thing) -> Result<Thing> {
-        if self.find_row(thing.id).await?.is_none() {
-            return Err(crate::Error::NotFound);
+        // A deleted thing is not found for an update, as for every read. The
+        // row's `is_deleted` / `deleted_at` came from the request body, so a
+        // plain `PUT` brought a deleted thing back, or deleted one without the
+        // delete path's audit and event (SEC-B13); they are the server's.
+        match self.find_row(thing.id).await? {
+            Some(row) if !row.is_deleted => {}
+            _ => return Err(crate::Error::NotFound),
         }
         // `created_at` is preserved (not overwritten by whatever the
         // domain value carries — a stale read or a defaulted-empty one);
         // `updated_at` is always refreshed to "now". Both are
         // server-managed, matching `create`.
         let mut row = thing_row(thing);
+        row.is_deleted = false;
+        row.deleted_at = None;
         row.updated_at = Utc::now();
 
         let mut txn = self.db.begin().await?;

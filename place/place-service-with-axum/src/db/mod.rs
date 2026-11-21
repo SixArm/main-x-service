@@ -521,8 +521,13 @@ impl PlaceRepository for PgPlaceRepository {
     }
 
     async fn update(&self, place: &Place) -> Result<Place> {
-        if self.find_row(place.id).await?.is_none() {
-            return Err(crate::Error::NotFound);
+        // A deleted place is not found for an update, as for every read. The
+        // row's `is_deleted` / `deleted_at` came from the request body, so a
+        // plain `PUT` brought a deleted place back, or deleted one without the
+        // delete path's audit and event (SEC-B13); they are the server's.
+        match self.find_row(place.id).await? {
+            Some(row) if !row.is_deleted => {}
+            _ => return Err(crate::Error::NotFound),
         }
         // T-16: reject an update that would close a containment cycle
         // through one or more existing ancestors (the case a plain
@@ -535,6 +540,8 @@ impl PlaceRepository for PgPlaceRepository {
         // refreshed to "now". Both are server-managed, matching `create`.
         let mut row = place_row(place);
         row.updated_at = Utc::now();
+        row.is_deleted = false;
+        row.deleted_at = None;
 
         let mut txn = self.db.begin().await?;
         if let Some(parent_id) = place.contained_in_place {

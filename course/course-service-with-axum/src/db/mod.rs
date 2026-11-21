@@ -341,9 +341,19 @@ impl CourseRepository for PgCourseRepository {
     }
 
     async fn update(&self, course: &Course) -> Result<Course> {
-        if self.find_row(course.id).await?.is_none() {
-            return Err(crate::Error::NotFound);
-        }
+        // A deleted course is not found for an update, as for every read:
+        // the row's `deleted_at` came from the request body, so a plain
+        // `PUT` brought a deleted course back, and could stamp or move
+        // `created_at` and `deleted_at` at will (SEC-B13). Both are the
+        // server's, so they are taken from the stored row.
+        let stored = match self.find_row(course.id).await? {
+            Some(row) if row.deleted_at.is_none() => row,
+            _ => return Err(crate::Error::NotFound),
+        };
+        let mut course = course.clone();
+        course.created_at = stored.created_at;
+        course.deleted_at = None;
+        let course = &course;
         let mut txn = self.db.begin().await?;
         apply_course_update(&mut txn, course).await?;
         // Outbox row shares the update transaction (see `create`).
@@ -360,7 +370,7 @@ impl CourseRepository for PgCourseRepository {
         // deleted one again would re-stamp `deleted_at`, losing when it was
         // really deleted, and emit a second `deleted` event (SEC-B12).
         match self.find_row(*id).await? {
-            Some(row) if row.active && row.deleted_at.is_none() => {}
+            Some(row) if row.deleted_at.is_none() => {}
             _ => return Err(crate::Error::NotFound),
         }
         // Soft delete: flip `active` off and stamp `deleted_at` rather

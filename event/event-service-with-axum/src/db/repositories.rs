@@ -1468,8 +1468,14 @@ impl EventRepository for PgEventRepository {
 
     async fn update(&self, event: &Event) -> Result<Event> {
         // Snapshot the pre-update state first so the audit log can carry
-        // an accurate `old_values` even though children are replaced.
-        let old = self.get_by_id(&event.id).await?;
+        // an accurate `old_values` even though children are replaced. An
+        // unknown or deleted event is not found: the row update writes
+        // `deleted_at = NULL`, so updating a deleted event brought it back
+        // (SEC-B13), and an unknown one failed on its child rows as a `500`.
+        let Some(existing) = self.get_by_id(&event.id).await? else {
+            return Err(crate::Error::EventNotFound(event.id.to_string()));
+        };
+        let old = Some(existing);
         let mut txn = self.db.begin().await?;
 
         // Parent-row update + wholesale child-row replacement, shared

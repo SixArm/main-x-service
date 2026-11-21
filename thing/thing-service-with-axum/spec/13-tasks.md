@@ -3,6 +3,7 @@
 Spec-driven work breakdown. Tick the box when an automated test or
 clearly described manual check confirms the acceptance criterion.
 
+- [x] **SEC-B13 — an update does not bring a deleted record back.** *(done 2026-11-21)* `PUT /api/things/{id}` on a deleted record answered `200` and it was served again; it is now `404`, and the deletion columns come from the stored row, not the request. `tests/delete_twice.rs` fails without the fix. Repo `tasks.md` SEC-B13.
 - [x] **SEC-B12 — a repeat delete is `404`.** *(done 2026-11-21)* `DELETE /api/things/{id}` on an unknown or already-deleted record answered `204`, re-stamped `deleted_at` and emitted another `deleted` event. It is now `404` and the stored deletion time is kept. `tests/delete_twice.rs` fails without the fix. Repo `tasks.md` SEC-B12.
 - [x] **SEC-M1 (security): input-size caps on the `Thing` payload.**
   `validate_thing` bounds scalar text (`MAX_TEXT_LEN = 1024`), string-array

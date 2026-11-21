@@ -2,6 +2,10 @@
 //! `404`. It used to answer `204` and re-stamp `deleted_at`, losing when
 //! the record was really deleted, and publish another `deleted` event.
 //!
+//! SEC-B13: an update does not bring a deleted record back. The update
+//! wrote the deletion columns from the request (or as cleared), so a plain
+//! `PUT` on a deleted record answered `200` and it was served again.
+//!
 //! `#[ignore]`d — run with `DB_URL=… cargo test --test delete_twice -- --ignored`.
 
 use axum::body::Body;
@@ -86,5 +90,38 @@ async fn a_second_delete_is_404_and_keeps_the_first_deletion_time() {
         None,
     )
     .await;
+    assert_eq!(status, StatusCode::NOT_FOUND, "an unknown id");
+}
+
+#[tokio::test]
+#[ignore = "requires PostgreSQL (DB_URL)"]
+async fn an_update_does_not_bring_a_deleted_record_back() {
+    let app = app().await;
+    let name = format!("Staydeleted {}", uuid::Uuid::new_v4().simple());
+    let (status, created) = call(&app, "POST", "/api/events", Some(&json!({ "id": "00000000-0000-0000-0000-000000000000", "active": true, "name": name, "start_date": "2026-06-01T18:00:00Z", "end_date": "2026-06-01T20:00:00Z", "event_status": "scheduled", "event_attendance_mode": "offline", "event_type": "conference", "all_day": false }))).await;
+    assert_eq!(status, StatusCode::CREATED, "{created}");
+    let id: uuid::Uuid = created["id"].as_str().unwrap().parse().unwrap();
+    let uri = format!("/api/events/{id}");
+    assert_eq!(
+        call(&app, "DELETE", &uri, None).await.0,
+        StatusCode::NO_CONTENT
+    );
+    let first = deleted_at(id).await.expect("deleted_at is stamped");
+
+    let name = "Brought back".to_string();
+    let (status, body) = call(&app, "PUT", &uri, Some(&json!({ "id": "00000000-0000-0000-0000-000000000000", "active": true, "name": name, "start_date": "2026-06-01T18:00:00Z", "end_date": "2026-06-01T20:00:00Z", "event_status": "scheduled", "event_attendance_mode": "offline", "event_type": "conference", "all_day": false }))).await;
+    assert_eq!(status, StatusCode::NOT_FOUND, "{body}");
+    assert_eq!(
+        call(&app, "GET", &uri, None).await.0,
+        StatusCode::NOT_FOUND,
+        "still deleted"
+    );
+    assert_eq!(
+        deleted_at(id).await,
+        Some(first),
+        "and the deletion time is kept"
+    );
+
+    let (status, _) = call(&app, "PUT", &format!("/api/events/{}", uuid::Uuid::new_v4()), Some(&json!({ "id": "00000000-0000-0000-0000-000000000000", "active": true, "name": name, "start_date": "2026-06-01T18:00:00Z", "end_date": "2026-06-01T20:00:00Z", "event_status": "scheduled", "event_attendance_mode": "offline", "event_type": "conference", "all_day": false }))).await;
     assert_eq!(status, StatusCode::NOT_FOUND, "an unknown id");
 }
