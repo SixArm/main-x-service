@@ -548,4 +548,164 @@ mod tests {
             map_identifier_scheme(&IdentifierType::ExternalRef, "https://b.example.org")
         );
     }
+
+    /// Every service event type maps to a matcher category; the six with
+    /// no schema.org counterpart travel as `Other` carrying their name.
+    #[test]
+    fn every_event_type_maps() {
+        use EventType as T;
+        let named = [
+            (T::Business, MCategory::BusinessEvent),
+            (T::Childrens, MCategory::ChildrensEvent),
+            (T::Comedy, MCategory::ComedyEvent),
+            (T::Conference, MCategory::ConferenceEvent),
+            (T::Course, MCategory::CourseInstance),
+            (T::Dance, MCategory::DanceEvent),
+            (T::Delivery, MCategory::DeliveryEvent),
+            (T::Education, MCategory::EducationEvent),
+            (T::Exhibition, MCategory::ExhibitionEvent),
+            (T::Festival, MCategory::Festival),
+            (T::Food, MCategory::FoodEvent),
+            (T::Hackathon, MCategory::Hackathon),
+            (T::Literary, MCategory::LiteraryEvent),
+            (T::Music, MCategory::MusicEvent),
+            (T::PerformingArts, MCategory::PerformingArtsEvent),
+            (T::Publication, MCategory::PublicationEvent),
+            (T::Sale, MCategory::SaleEvent),
+            (T::Screening, MCategory::ScreeningEvent),
+            (T::Series, MCategory::EventSeries),
+            (T::Social, MCategory::SocialEvent),
+            (T::Sports, MCategory::SportsEvent),
+            (T::Theater, MCategory::TheaterEvent),
+            (T::VisualArts, MCategory::VisualArtsEvent),
+        ];
+        for (t, want) in named {
+            assert_eq!(map_event_type(&t), want, "{t:?}");
+        }
+        for (t, name) in [
+            (T::Generic, "Generic"),
+            (T::Appointment, "Appointment"),
+            (T::Encounter, "Encounter"),
+            (T::Shift, "Shift"),
+            (T::Incident, "Incident"),
+            (T::Session, "Session"),
+        ] {
+            assert_eq!(map_event_type(&t), MCategory::Other(name.into()));
+        }
+    }
+
+    /// Every status maps; `Completed` shares `Scheduled`'s arm, since the
+    /// matcher has no completed status.
+    #[test]
+    fn every_status_maps() {
+        assert_eq!(map_status(EventStatus::Scheduled), MStatus::EventScheduled);
+        assert_eq!(map_status(EventStatus::Completed), MStatus::EventScheduled);
+        assert_eq!(map_status(EventStatus::Cancelled), MStatus::EventCancelled);
+        assert_eq!(map_status(EventStatus::Postponed), MStatus::EventPostponed);
+        assert_eq!(
+            map_status(EventStatus::Rescheduled),
+            MStatus::EventRescheduled
+        );
+        assert_eq!(
+            map_status(EventStatus::MovedOnline),
+            MStatus::EventMovedOnline
+        );
+    }
+
+    /// A known platform in the system URI names its scheme, whatever the
+    /// type; anything else becomes `Other`, carrying the type and system.
+    #[test]
+    fn identifier_schemes_by_system_then_type() {
+        use IdentifierType as I;
+        for (system, want) in [
+            ("https://www.meetup.com/x", MScheme::Meetup),
+            ("ticketmaster", MScheme::Ticketmaster),
+            ("songkick.com", MScheme::Songkick),
+            ("bandsintown", MScheme::Bandsintown),
+            ("https://fb.com/events", MScheme::Facebook),
+            ("https://lu.ma/x", MScheme::Luma),
+            ("https://calendar.google.com", MScheme::GoogleCalendar),
+            ("https://www.wikidata.org", MScheme::Wikidata),
+            ("urn:ical:uid", MScheme::ICalendarUid),
+        ] {
+            assert_eq!(map_identifier_scheme(&I::Other, system), want, "{system}");
+        }
+        for (t, name) in [
+            (I::BookingNumber, "BookingNumber"),
+            (I::ConfirmationCode, "ConfirmationCode"),
+            (I::TicketNumber, "TicketNumber"),
+            (I::EncounterId, "EncounterId"),
+            (I::TransactionId, "TransactionId"),
+            (I::ExternalRef, "ExternalRef"),
+            (I::Tax, "Tax"),
+            (I::Other, "Other"),
+        ] {
+            assert_eq!(map_identifier_scheme(&t, "  "), MScheme::Other(name.into()));
+            assert_eq!(
+                map_identifier_scheme(&t, "urn:acme"),
+                MScheme::Other(format!("{name}@urn:acme"))
+            );
+        }
+    }
+
+    /// A bare postal address maps with `state` becoming the matcher's
+    /// `county`; a text location becomes the venue name; a location with
+    /// nothing in it maps to nothing.
+    #[test]
+    fn postal_text_and_empty_locations() {
+        let address = crate::models::Address {
+            use_type: None,
+            line1: Some("1 Hall Road".into()),
+            line2: Some("Floor 2".into()),
+            city: Some("Cardiff".into()),
+            state: Some("Glamorgan".into()),
+            postal_code: Some("CF10 1AA".into()),
+            country: Some("GB".into()),
+        };
+        let mut e = svc_event("Talk");
+        e.location = vec![Location::PostalAddress(address.clone())];
+        let m = to_matcher_event(&e);
+        let a = m.location.as_ref().unwrap().address.as_ref().unwrap();
+        assert_eq!(a.city.as_deref(), Some("Cardiff"));
+        assert_eq!(a.county.as_deref(), Some("Glamorgan"));
+        assert_eq!(a.postcode.as_deref(), Some("CF10 1AA"));
+
+        e.location = vec![Location::Place(Place {
+            id: None,
+            name: " ".into(),
+            address: Some(address),
+            latitude_as_decimal_degrees: None,
+            longitude_as_decimal_degrees: None,
+            url: None,
+        })];
+        let m = to_matcher_event(&e);
+        assert!(
+            m.location.as_ref().unwrap().address.is_some(),
+            "a place's address"
+        );
+
+        e.location = vec![Location::Text {
+            value: " Main stage ".into(),
+        }];
+        assert_eq!(
+            to_matcher_event(&e).location.unwrap().venue_name.as_deref(),
+            Some("Main stage")
+        );
+        e.location = vec![Location::Text { value: "  ".into() }];
+        assert!(
+            to_matcher_event(&e).location.is_none(),
+            "nothing to match on"
+        );
+        let empty = crate::models::Address {
+            use_type: None,
+            line1: None,
+            line2: None,
+            city: None,
+            state: None,
+            postal_code: None,
+            country: None,
+        };
+        e.location = vec![Location::PostalAddress(empty)];
+        assert!(to_matcher_event(&e).location.is_none());
+    }
 }

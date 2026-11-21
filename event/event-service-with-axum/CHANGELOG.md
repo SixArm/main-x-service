@@ -15,6 +15,14 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
   third byte panicked. It now compares by character. Not reachable from a
   request: no request path scores with this module since T-16.
 
+### Added — unit tests for the matcher adapter
+
+- Every event type and status maps to the matcher's; identifier schemes
+  come from the system URI and otherwise travel as `Other` carrying type
+  and system; a postal address maps with `state` as `county`, a place's
+  address and a text venue come across, and an empty location maps to
+  nothing (the adapter was 79% covered).
+
 ### Added — unit tests for the validators
 
 - Addresses need a city, postal code or country, bare or on a place, and
