@@ -8,6 +8,19 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ## [Unreleased]
 
+### Added — FHIR Location and relay drain tests
+
+- `tests/fhir_crud.rs`, the crate's first FHIR request tests (the
+  controller was 30% covered with the DB suite): the `CapabilityStatement`;
+  a `Location` create → read → `_id` search → update → delete → `404`; a
+  non-JSON body on create and update and an unnamed Location are
+  client-error `OperationOutcome`s; a 5000-character name is `422` on
+  create and refused on update (the native validation applies); an
+  unknown id is `404` on read, update and delete.
+- `tests/relay_drain.rs`: a failing sink publishes nothing, a working one
+  stamps `published_at` without resending, and the retention purge removes
+  published rows; no broker needed.
+
 ### Changed — timestamp conversions are total (SEC-M10)
 
 - `db/convert.rs` converted between `chrono` and `time` through an `i64`
