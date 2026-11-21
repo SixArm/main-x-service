@@ -226,6 +226,58 @@ fn render(person: &crate::models::Person, resource_type: &str) -> FhirPerson {
     }
 }
 
+/// The native validation a FHIR write must pass, as `POST` / `PUT
+/// /api/persons` do (`agents/share/fhir.md` §2): each problem as one issue
+/// of a `422` `processing` outcome. Without it a FHIR write skipped the
+/// required-field and format rules and the SEC-M1 input-size caps.
+fn validation_refusal(person: &crate::models::Person) -> Option<Response> {
+    let errors = crate::validation::validate_person(person);
+    (!errors.is_empty()).then(|| {
+        let messages: Vec<String> = errors
+            .iter()
+            .map(|e| format!("{}: {}", e.field, e.message))
+            .collect();
+        fhir_json(
+            StatusCode::UNPROCESSABLE_ENTITY,
+            &FhirOperationOutcome::errors("processing", &messages),
+        )
+    })
+}
+
+/// The record-level decision a write takes before it touches the row, as
+/// `PUT` / `DELETE /api/persons/{id}` take it (SEC-G9): load the stored
+/// person (`404` if there is none) and authorise `action` on its
+/// attributes, so a `resource.*` policy holds on the FHIR surface too.
+async fn authorize_stored_write(
+    state: &AppState,
+    id: Uuid,
+    caller: &MaybeAuthUser,
+    action: Action,
+) -> Result<(), Box<Response>> {
+    let decision: Result<(), Response> = match state.person_repository.get_by_id(&id).await {
+        Ok(Some(existing)) => authorize_record(caller, action, &person_resource_attrs(&existing))
+            .map(|_| ())
+            .map_err(|(status, reason)| {
+                let code = if status == StatusCode::UNAUTHORIZED {
+                    "login"
+                } else {
+                    "forbidden"
+                };
+                fhir_error(status, code, &reason)
+            }),
+        Ok(None) => Err(fhir_json(
+            StatusCode::NOT_FOUND,
+            &FhirOperationOutcome::not_found("Patient", &id.to_string()),
+        )),
+        Err(e) => Err(fhir_error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "exception",
+            &e.to_string(),
+        )),
+    };
+    decision.map_err(Box::new)
+}
+
 /// `POST /fhir/Patient` — create a person from a FHIR `Patient` payload.
 /// `201` + `Location`; `400` on unparseable/invalid FHIR; `500` on a
 /// database error. Persist reuses the repository, so audit + events fire.
@@ -249,6 +301,9 @@ pub async fn create_fhir_patient(
         Ok(p) => p,
         Err(e) => return fhir_error(StatusCode::BAD_REQUEST, "invalid", &e.to_string()),
     };
+    if let Some(refused) = validation_refusal(&person) {
+        return refused;
+    }
     if person.id == Uuid::nil() {
         person.id = Uuid::new_v4();
     }
@@ -280,7 +335,8 @@ pub async fn create_fhir_patient(
 }
 
 /// `PUT /fhir/Patient/{id}` — replace a person from a FHIR payload. The
-/// path id is authoritative. `200` updated; `400` invalid; `500` db error.
+/// path id is authoritative. `200` updated; `400` invalid; `422` failed
+/// validation; `404` unknown; `403` refused on the stored record (SEC-G9).
 pub async fn update_fhir_patient(
     State(state): State<AppState>,
     Path(id): Path<String>,
@@ -305,6 +361,12 @@ pub async fn update_fhir_patient(
         Ok(p) => p,
         Err(e) => return fhir_error(StatusCode::BAD_REQUEST, "invalid", &e.to_string()),
     };
+    if let Some(refused) = validation_refusal(&person) {
+        return refused;
+    }
+    if let Err(refused) = authorize_stored_write(&state, id, &caller, Action::Write).await {
+        return *refused;
+    }
     person.id = id;
     let ctx = audit_context_of(&caller, client);
     match state.person_repository.update(&person, &ctx).await {
@@ -324,7 +386,7 @@ pub async fn update_fhir_patient(
 }
 
 /// `DELETE /fhir/Patient/{id}` — soft-delete a person. `204` no body;
-/// `400` bad id; `500` db error.
+/// `400` bad id; `404` unknown; `403` refused on the stored record (SEC-G9).
 pub async fn delete_fhir_patient(
     State(state): State<AppState>,
     Path(id): Path<String>,
@@ -334,6 +396,9 @@ pub async fn delete_fhir_patient(
     let Some(id) = parse_id(&id) else {
         return bad_id();
     };
+    if let Err(refused) = authorize_stored_write(&state, id, &caller, Action::Delete).await {
+        return *refused;
+    }
     let ctx = audit_context_of(&caller, client);
     match state.person_repository.delete(&id, &ctx).await {
         Ok(()) => fhir_response(StatusCode::NO_CONTENT, Vec::new(), None),

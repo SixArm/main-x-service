@@ -8,6 +8,15 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ## [Unreleased]
 
+### Fixed — FHIR writes take the record-level decision and validation (SEC-G9)
+
+- `PUT` and `DELETE /fhir/Patient/{id}` skipped the record-level ABAC
+  check the REST writes run on the stored person, so a `resource.*` policy
+  (e.g. no writes to an inactive person) was bypassed through FHIR, and an
+  unknown id was a `500`. FHIR create and update also skipped
+  `validate_person`, including the SEC-M1 input-size caps. Both now match
+  the native surface, answering with an `OperationOutcome`.
+
 ### Added — GDPR residency and lawful-basis declarations (NW-6)
 
 - `PERSON_DATA_RESIDENCY`, `PERSON_LAWFUL_BASIS`, `PERSON_ART9_CONDITION` and

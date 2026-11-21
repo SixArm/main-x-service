@@ -2603,14 +2603,14 @@
   - [x] worker — fixed 2026-11-20 (`authorize_stored_write`; also turns an
     unknown id from `500` into `404 not-found`). `tests/fhir_write_abac.rs`
     fails without the fix.
-  - [ ] person — `update_fhir_patient` / `delete_fhir_patient`.
+  - [x] person — fixed 2026-11-21, with validation. `tests/fhir_write_abac.rs`.
   - [ ] organization — `controllers/fhir.rs` `update` / `remove`.
   - [ ] care-pathway — `controllers/fhir.rs` `update` / `remove`.
   - [x] case — fixed 2026-11-20; FHIR create and update also skipped
     validation (SEC-M1 caps), now applied. `tests/fhir_write_abac.rs`.
   - [ ] **FHIR writes skip native validation** (SEC-M1 caps included) in
-    person and organization too; worker fixed 2026-11-20, case with its
-    SEC-G9 fix; care-pathway already validates.
+    organization too; worker fixed 2026-11-20, case and person with their
+    SEC-G9 fixes; care-pathway already validates.
 - [x] **SEC-G9 (S) 🟠** Masking left emergency contacts' phone numbers
   whole. *(found and done 2026-11-09)* Person's and worker's
   `mask_person` / `mask_worker` mask the subject's phone, SMS and fax
