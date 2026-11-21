@@ -8,6 +8,15 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ## [Unreleased]
 
+### Changed — timestamp conversions are total (SEC-M10)
+
+- `db/convert.rs` converted between `chrono` and `time` through an `i64`
+  of nanoseconds, which ends in 2262, and panicked past it. It now goes
+  through seconds and the sub-second part, covering every year `time`
+  holds, with a fallible `try_ts_to_offset` for caller input. No caller
+  input reaches it here today; worker and person panicked on a far-future
+  `since` through the same code.
+
 ### Changed — review queue paging (T-20)
 
 - `GET /api/places/review-queue` pages by signed cursor: `?limit=&cursor=`

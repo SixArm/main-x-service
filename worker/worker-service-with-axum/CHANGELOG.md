@@ -8,6 +8,13 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ## [Unreleased]
 
+### Added — the bulk links pull is tested as a privileged read
+
+- `tests/bulk_links_enforced.rs`: with enforcement on and the default
+  policy, a caller with no attributes or `access=write` is `403`, a
+  machine peer or an admin is `200`, and no token is `401` (SEC-G1). The
+  test fails if the pull is classified as an ordinary read.
+
 ### Fixed — a far-future `since` panicked the bulk links pull (SEC-M10)
 
 - `GET /api/workers/links?since=2999-01-01T00:00:00Z` panicked into a
