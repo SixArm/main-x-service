@@ -36,6 +36,36 @@ struct PlaceDto {
     capacity: Option<i32>,
 }
 
+/// The variants place-service's `PlaceType` names; anything else travels
+/// as its `Other` variant.
+const PLACE_SERVICE_TYPES: &[&str] = &[
+    "LocalBusiness",
+    "CivicStructure",
+    "AdministrativeArea",
+    "Landform",
+    "Park",
+    "Airport",
+    "Hospital",
+    "School",
+    "Library",
+    "Museum",
+    "Restaurant",
+    "Hotel",
+];
+
+/// A place type as place-service reads it. Its `PlaceType` is an
+/// externally tagged enum, so a type it does not name must be sent as
+/// `{"Other": "…"}`: a bare `"FileCabinet"` or `"RecordsRoom"` was refused
+/// with `422`, so no records room or cabinet could be created against the
+/// real service. Reading back already accepts both forms.
+fn place_type_wire(place_type: &str) -> serde_json::Value {
+    if PLACE_SERVICE_TYPES.contains(&place_type) {
+        serde_json::Value::String(place_type.to_string())
+    } else {
+        serde_json::json!({ "Other": place_type })
+    }
+}
+
 /// The body returned by the place search endpoint.
 ///
 /// place-service answers `{"results": [...], "total": n}`; this read only
@@ -181,7 +211,7 @@ impl Client for HttpClient {
         let mut payload = json!({
             "id": Uuid::new_v4(),
             "name": input.name,
-            "place_type": input.place_type,
+            "place_type": place_type_wire(&input.place_type),
             "description": input.description,
             "contained_in_place": input.contained_in_place,
             "keywords": [],
@@ -216,7 +246,22 @@ impl Client for HttpClient {
 
 #[cfg(test)]
 mod envelope_tests {
-    use super::SearchEnvelope;
+    use super::{SearchEnvelope, place_type_wire};
+
+    /// A type place-service names is sent bare; the records-room and
+    /// cabinet types it does not name go as its `Other` variant.
+    #[test]
+    fn place_types_are_sent_in_place_services_form() {
+        assert_eq!(place_type_wire("Hospital"), serde_json::json!("Hospital"));
+        assert_eq!(
+            place_type_wire("FileCabinet"),
+            serde_json::json!({ "Other": "FileCabinet" })
+        );
+        assert_eq!(
+            place_type_wire("RecordsRoom"),
+            serde_json::json!({ "Other": "RecordsRoom" })
+        );
+    }
 
     /// place-service's live search body is `{"results": [...], "total": n}`;
     /// the older `places` key still reads.

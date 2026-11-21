@@ -10,6 +10,13 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Fixed — records rooms and cabinets can be created against place-service
+
+- The place client sent `place_type` as a bare `"FileCabinet"` or
+  `"RecordsRoom"`; place-service's `PlaceType` is a tagged enum that names
+  neither, so it answered `422` and no room or cabinet could be created.
+  A type place-service does not name is now sent as `{"Other": …}`.
+
 ### Fixed — cabinet search reads place-service's `results` key
 
 - place-service answers search with `{"results": [...], "total": n}`; the

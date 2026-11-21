@@ -35,6 +35,11 @@
   payload to event-service's router): against the real service no move is
   ever recorded. The casing is case-folder's to fix; the type has nowhere to
   go, so this is part of the same decision.
+  The place and patient clients were checked the same way (each posting
+  its own payload to the real router): patient works end to end; place's
+  create sent `"FileCabinet"` / `"RecordsRoom"` as bare strings, which
+  place-service's tagged `PlaceType` refuses with `422`, and now sends them
+  as `{"Other": …}` (fixed, with its search envelope).
 
 ## Delivered (baseline — both editions in repo)
 
