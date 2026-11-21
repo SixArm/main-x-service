@@ -8,6 +8,17 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ## [Unreleased]
 
+### Added — HTTP tests for the review queue, checkpoints, merge and 404s
+
+- `tests/handlers_http.rs`, ported from worker: a review-queue decision is
+  first-writer-wins (a second is `422`, an unknown id `404`); the audit
+  checkpoint is honoured and each alteration gets its verdict without the
+  shared chain being touched; a merge carries the duplicate's identifiers
+  and addresses to the survivor and the duplicate stops being served; the
+  audit listings answer; every single-person endpoint is `404` for an
+  unknown id except erasure, which answers by design. Sub-resources of a
+  deleted person and worker (links, assessments) were checked: all `404`.
+
 ### Added — bulk HTTP and relay drain tests
 
 - `tests/bulk_http.rs`, the first tests of the bulk endpoints over HTTP
