@@ -10,6 +10,17 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Fixed — cabinet search reads place-service's `results` key
+
+- place-service answers search with `{"results": [...], "total": n}`; the
+  place client read only `places`, so every cabinet search against the
+  real service was silently empty. Both keys are accepted.
+
+### Found — the folder store does not match thing-service (CF-X1, open)
+
+- The thing client's fields, `PATCH` and `{"things": [...]}` envelope are
+  not thing-service's contract; recorded in `spec/tasks.md` for a decision.
+
 ### Changed — axa 0.11
 
 - `axa` 0.10 → 0.11 and `axa-test` 0.1 → 0.2. **Deploy settings change before

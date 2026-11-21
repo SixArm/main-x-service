@@ -37,10 +37,14 @@ struct PlaceDto {
 }
 
 /// The body returned by the place search endpoint.
+///
+/// place-service answers `{"results": [...], "total": n}`; this read only
+/// `places`, so against the real service every cabinet search was silently
+/// empty. Both names are accepted, `results` being the live one.
 #[derive(Debug, Deserialize, Default)]
 struct SearchEnvelope {
     /// Matching places.
-    #[serde(default)]
+    #[serde(default, alias = "results")]
     places: Vec<PlaceDto>,
 }
 
@@ -207,5 +211,23 @@ impl Client for HttpClient {
             .await
             .map_err(|e| Error::BadResponse(e.to_string()))?;
         Ok(PlaceDto::into_place(body))
+    }
+}
+
+#[cfg(test)]
+mod envelope_tests {
+    use super::SearchEnvelope;
+
+    /// place-service's live search body is `{"results": [...], "total": n}`;
+    /// the older `places` key still reads.
+    #[test]
+    fn search_envelope_reads_place_services_results_key() {
+        let id = uuid::Uuid::new_v4();
+        for key in ["results", "places"] {
+            let body = serde_json::json!({ key: [{ "id": id, "name": "Cabinet A" }], "total": 1 });
+            let env: SearchEnvelope = serde_json::from_value(body).expect("parses");
+            assert_eq!(env.places.len(), 1, "{key}");
+            assert_eq!(env.places[0].id, id);
+        }
     }
 }

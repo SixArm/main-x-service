@@ -9049,3 +9049,20 @@ Kept as they were by worker's SQ-1, then fixed (crate spec §13).
   boot (or as a CLI task), report every spec §6 setting that is at its
   permissive default, so a missing one is visible instead of silent.
   Depends: NW-1, NW-6.
+
+## Found 2026-11-21 (measuring case-folder coverage)
+
+- [ ] **CF-X1 (case-folder `spec/tasks.md`) — The folder store does not match thing-service's contract.**
+  *(found 2026-11-21, measuring case-folder coverage)* case-folder keeps
+  folders and volumes as Things, and its thing client writes `thing_type`
+  (`{"Other": "CaseFile"}`), `keywords` (`patient_id=`, `cabinet_path=`,
+  …) and `contained_in_thing`, updates with `PATCH /api/things/{id}`, and
+  reads search results from `{"things": [...]}`. thing-service has none
+  of those fields (its nearest is `additional_type`), routes `GET`/`PUT`/
+  `DELETE` only, and answers search with `{"results": [...], "total": n}`.
+  Against the real service a folder search is silently empty, a created
+  folder loses the fields that make it a folder, and a rename or move is
+  refused. Needs a decision: extend thing-service's model (type, keywords,
+  containment, `PATCH`), or re-model folders on what thing-service holds.
+  The place client had the same envelope drift (`places` vs `results`);
+  that one is fixed, since it changes nothing but the key read.
