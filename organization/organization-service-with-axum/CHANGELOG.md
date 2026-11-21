@@ -9,6 +9,15 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — FHIR metadata, round trip and error tests
+
+- `tests/requests/fhir.rs` `fhir_metadata_crud_and_errors`: the
+  `CapabilityStatement`; create → read → update → delete → `404
+  not-found`; a non-JSON body is `400 structure` on create and update, a
+  non-Organization resource is a client-error `OperationOutcome`, and
+  `PUT`/`DELETE` of an unknown id is `404`. Organization's FHIR controller
+  was 54% covered with the DB suite included.
+
 ### Fixed — FHIR writes take the native validation (SEC-G10)
 
 - `POST` and `PUT /fhir/Organization` skipped the validation the native

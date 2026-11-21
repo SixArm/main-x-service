@@ -160,3 +160,81 @@ async fn fhir_writes_take_the_native_validation() {
     })
     .await;
 }
+
+/// The capability statement, and a full create → read → update → delete
+/// round trip, with the error each malformed or unknown request gets.
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with: cargo test -- --ignored"]
+async fn fhir_metadata_crud_and_errors() {
+    super::isolate_search_index();
+    request::<App, _, _>(|request, _ctx| async move {
+        let json_of = |text: String| serde_json::from_str::<Value>(&text).unwrap();
+
+        let meta = request.get("/fhir/metadata").await;
+        assert_eq!(meta.status_code(), 200);
+        let statement = json_of(meta.text());
+        assert_eq!(statement["resourceType"], "CapabilityStatement");
+        assert_eq!(statement["fhirVersion"], "5.0.0");
+        assert_eq!(statement["rest"][0]["resource"][0]["type"], "Organization");
+
+        let created = request
+            .post("/fhir/Organization")
+            .json(&json!({ "resourceType": "Organization", "name": "Roundtrip Ltd" }))
+            .await;
+        assert_eq!(created.status_code(), 201, "{}", created.text());
+        let id = json_of(created.text())["id"].as_str().unwrap().to_string();
+
+        let read = request.get(&format!("/fhir/Organization/{id}")).await;
+        assert_eq!(read.status_code(), 200);
+        assert_eq!(json_of(read.text())["name"], "Roundtrip Ltd");
+
+        let updated = request
+            .put(&format!("/fhir/Organization/{id}"))
+            .json(&json!({ "resourceType": "Organization", "id": id, "name": "Renamed Ltd" }))
+            .await;
+        assert_eq!(updated.status_code(), 200, "{}", updated.text());
+        assert_eq!(json_of(updated.text())["name"], "Renamed Ltd");
+
+        let deleted = request.delete(&format!("/fhir/Organization/{id}")).await;
+        assert!(deleted.status_code().is_success(), "{}", deleted.text());
+        let gone = request.get(&format!("/fhir/Organization/{id}")).await;
+        assert_eq!(gone.status_code(), 404);
+        assert_eq!(json_of(gone.text())["issue"][0]["code"], "not-found");
+
+        // Malformed bodies: not JSON is `structure`; JSON that is not an
+        // Organization is a client error; both are OperationOutcomes.
+        let bad = request
+            .post("/fhir/Organization")
+            .bytes("not json".into())
+            .content_type("application/fhir+json")
+            .await;
+        assert_eq!(bad.status_code(), 400, "{}", bad.text());
+        assert_eq!(json_of(bad.text())["issue"][0]["code"], "structure");
+        let put_bad = request
+            .put(&format!("/fhir/Organization/{id}"))
+            .bytes("not json".into())
+            .content_type("application/fhir+json")
+            .await;
+        assert_eq!(put_bad.status_code(), 400);
+        let wrong = request
+            .post("/fhir/Organization")
+            .json(&json!({ "resourceType": "Patient" }))
+            .await;
+        assert!(wrong.status_code().is_client_error(), "{}", wrong.text());
+        assert_eq!(json_of(wrong.text())["resourceType"], "OperationOutcome");
+
+        // Unknown ids.
+        let missing = uuid::Uuid::new_v4();
+        let r = request
+            .put(&format!("/fhir/Organization/{missing}"))
+            .json(&json!({ "resourceType": "Organization", "name": "Nobody Ltd" }))
+            .await;
+        assert_eq!(r.status_code(), 404, "{}", r.text());
+        let r = request
+            .delete(&format!("/fhir/Organization/{missing}"))
+            .await;
+        assert_eq!(r.status_code(), 404, "{}", r.text());
+    })
+    .await;
+}
