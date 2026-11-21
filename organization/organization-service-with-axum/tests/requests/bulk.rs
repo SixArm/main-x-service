@@ -465,3 +465,93 @@ async fn an_import_over_the_default_body_limit_is_accepted() {
     })
     .await;
 }
+
+/// The refusals and idempotency the happy-path tests do not reach: a
+/// missing file and an unknown masking profile are `400`; a dry run
+/// classifies without writing; a repeated `Idempotency-Key` returns the
+/// same job instead of a second one; an unknown job id, and an import's id
+/// asked for as an export, are `404`.
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with: cargo test -- --ignored"]
+async fn bulk_refusals_dry_run_and_idempotency() {
+    super::isolate_search_index();
+    request::<App, _, _>(|request, _ctx| async move {
+        let form = MultipartForm::new().add_text("format", "jsonl");
+        let r = request
+            .post("/api/organizations/import")
+            .multipart(form)
+            .await;
+        assert_eq!(r.status_code(), 400, "{}", r.text());
+        assert!(r.text().contains("missing_file"), "{}", r.text());
+
+        let r = request
+            .post("/api/organizations/export")
+            .json(&json!({ "format": "jsonl", "masking_profile": "partial" }))
+            .await;
+        assert_eq!(r.status_code(), 400, "{}", r.text());
+        assert!(r.text().contains("unsupported_masking_profile"));
+
+        // Dry run: the row is classified as a create, and nothing is written.
+        let name = "Dryrun Only Organisation";
+        let bytes = jsonl::encode(&[(None, Organization::new(name))]).unwrap();
+        let form = MultipartForm::new()
+            .add_text("format", "jsonl")
+            .add_text("dry_run", "true")
+            .add_part("file", Part::bytes(bytes.clone()).file_name("import.jsonl"));
+        let r = request
+            .post("/api/organizations/import")
+            .multipart(form)
+            .await;
+        assert_eq!(r.status_code(), 202, "{}", r.text());
+        let job_id = r.json::<serde_json::Value>()["job_id"]
+            .as_str()
+            .unwrap()
+            .to_string();
+        let status = import_status(&request, &job_id).await;
+        assert_eq!(status["status"], "completed", "{status}");
+        let hits: serde_json::Value = request
+            .get("/api/organizations/search?q=Dryrun%20Only%20Organisation")
+            .await
+            .json();
+        assert!(
+            hits.as_array().unwrap().is_empty(),
+            "a dry run writes nothing: {hits}"
+        );
+
+        // The same Idempotency-Key is the same job, for both kinds.
+        let key = format!("idem-{}", uuid::Uuid::new_v4());
+        let submit = || {
+            let form = MultipartForm::new()
+                .add_text("format", "jsonl")
+                .add_text("dry_run", "true")
+                .add_part("file", Part::bytes(bytes.clone()).file_name("import.jsonl"));
+            request
+                .post("/api/organizations/import")
+                .add_header("idempotency-key", key.as_str())
+                .multipart(form)
+        };
+        let first = submit().await.json::<serde_json::Value>()["job_id"].clone();
+        let second = submit().await.json::<serde_json::Value>()["job_id"].clone();
+        assert_eq!(first, second, "a retried import is the same job");
+        let export = || {
+            request
+                .post("/api/organizations/export")
+                .add_header("idempotency-key", key.as_str())
+                .json(&json!({ "format": "jsonl" }))
+        };
+        let e1 = export().await.json::<serde_json::Value>()["job_id"].clone();
+        let e2 = export().await.json::<serde_json::Value>()["job_id"].clone();
+        assert_eq!(e1, e2, "a retried export is the same job");
+
+        let unknown = uuid::Uuid::new_v4();
+        for uri in [
+            format!("/api/organizations/import/{unknown}"),
+            format!("/api/organizations/export/{unknown}"),
+            format!("/api/organizations/export/{job_id}"),
+        ] {
+            assert_eq!(request.get(&uri).await.status_code(), 404, "{uri}");
+        }
+    })
+    .await;
+}

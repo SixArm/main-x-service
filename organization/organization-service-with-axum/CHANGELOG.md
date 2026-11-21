@@ -16,6 +16,11 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   rather than failed, an edited row is reported once by id and makes the
   run unverified, and a forged SHA-3 digest alone is caught. Every report
   carries the caveat that deletion is not detected.
+- `tests/requests/bulk.rs` `bulk_refusals_dry_run_and_idempotency`: a
+  missing file and an unknown masking profile are `400`; a dry run
+  completes and writes nothing; a repeated `Idempotency-Key` returns the
+  same import or export job; an unknown job id, and an import id asked for
+  as an export, are `404`.
 - `tests/relay_drain.rs`: against a real outbox with no broker, a failing
   sink publishes nothing and the row waits; a working sink stamps
   `published_at`, keyed by pid, and does not resend; the retention purge
