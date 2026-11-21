@@ -68,7 +68,11 @@ narrative summary + the durable invariants those fixes establish.
   `check-duplicates`, the create-time `409` and gRPC list conceal a
   record the caller may not read and mask one under a `mask`
   obligation. The **default-off exposure pin** (SEC-G8) is closed too
-  (§7).
+  (§7). **FHIR writes** (SEC-G10, 2026-11-21): worker's, case's and
+  person's `PUT`/`DELETE` on `/fhir` skipped the record-level decision
+  their REST writes take, so a `resource.*` policy could be bypassed
+  through FHIR; and FHIR create/update in those three and organization
+  skipped validation, SEC-M1 caps included. Both now match REST.
 - **F-data — bulk / linking / concurrency integrity.** Fixed: the
   **critical reconcile scoping bug** (link-graph diffed the *global*
   read-model against *one* entity's edges, so each pass deleted the others'
