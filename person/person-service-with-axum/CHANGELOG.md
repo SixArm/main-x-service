@@ -8,6 +8,15 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ## [Unreleased]
 
+### Added — FHIR conversion unit tests
+
+- The module had none. The same person serves as `Patient` and as the
+  `Person` alias and either converts back; contact points of every system
+  and use, addresses, marital status and identifiers round-trip; no name
+  or a bad id is refused; an unknown or valueless contact point is dropped,
+  an unknown use is none, marital status falls back to the first coding,
+  and a second name becomes an alias.
+
 ### Added — HTTP tests for the review queue, checkpoints, merge and 404s
 
 - `tests/handlers_http.rs`, ported from worker: a review-queue decision is

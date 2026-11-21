@@ -548,3 +548,140 @@ pub fn from_fhir_person(fhir_person: &FhirPerson) -> Result<Person> {
         updated_at: Utc::now(),
     })
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::models::{
+        Address, ContactPoint, ContactPointSystem as S, ContactPointUse as U, Gender, HumanName,
+        Identifier, IdentifierType, Person,
+    };
+
+    fn sample_person() -> Person {
+        let name = HumanName {
+            use_type: None,
+            family: "Smith".to_string(),
+            given: vec!["Jane".to_string()],
+            prefix: vec![],
+            suffix: vec![],
+        };
+        let mut person = Person::new(name, Gender::Female);
+        person.birth_date = "1980-01-15".parse::<chrono::NaiveDate>().ok();
+        person
+    }
+
+    /// The same person serves as a FHIR `Patient` (primary) and `Person`
+    /// (alias), and either converts back to the same core fields.
+    #[test]
+    fn patient_and_person_views_round_trip() {
+        let person = sample_person();
+        let patient = to_fhir_patient(&person);
+        let alias = to_fhir_person(&person);
+        assert_eq!(patient.resource_type, "Patient");
+        assert_eq!(alias.resource_type, "Person");
+        for fhir in [patient, alias] {
+            let back = from_fhir_person(&fhir).expect("round trip");
+            assert_eq!(back.id, person.id);
+            assert_eq!(back.name.family, "Smith");
+            assert_eq!(back.gender, person.gender);
+            assert_eq!(back.birth_date, person.birth_date);
+        }
+    }
+
+    /// Contact points of every system and use, addresses, marital status
+    /// and identifiers survive the trip to FHIR and back.
+    #[test]
+    fn round_trip_carries_contacts_addresses_and_status() {
+        let mut person = sample_person();
+        let systems = [
+            S::Phone,
+            S::Fax,
+            S::Email,
+            S::Pager,
+            S::Url,
+            S::Sms,
+            S::Other,
+        ];
+        let uses = [
+            Some(U::Home),
+            Some(U::Work),
+            Some(U::Temp),
+            Some(U::Old),
+            Some(U::Mobile),
+            None,
+            Some(U::Home),
+        ];
+        person.telecom = systems
+            .iter()
+            .zip(uses)
+            .enumerate()
+            .map(|(i, (system, use_type))| ContactPoint {
+                system: system.clone(),
+                value: format!("v{i}"),
+                use_type,
+            })
+            .collect();
+        person.addresses = vec![Address {
+            use_type: None,
+            line1: Some("1 Hall Road".into()),
+            line2: Some("Floor 2".into()),
+            city: Some("Cardiff".into()),
+            state: Some("Glamorgan".into()),
+            postal_code: Some("CF10 1AA".into()),
+            country: Some("GB".into()),
+        }];
+        person.marital_status = Some("married".into());
+        person.identifiers = vec![Identifier::new(
+            IdentifierType::SSN,
+            "urn:ssn".into(),
+            "123".into(),
+        )];
+
+        let back = from_fhir_person(&to_fhir_patient(&person)).expect("round trip");
+        assert_eq!(
+            serde_json::to_value(&back.telecom).unwrap(),
+            serde_json::to_value(&person.telecom).unwrap()
+        );
+        assert_eq!(back.addresses[0].line2.as_deref(), Some("Floor 2"));
+        assert_eq!(back.addresses[0].postal_code.as_deref(), Some("CF10 1AA"));
+        assert_eq!(back.marital_status.as_deref(), Some("married"));
+        assert_eq!(back.identifiers[0].value, "123");
+    }
+
+    /// From FHIR: no name is refused, a bad id is refused, an unknown or
+    /// valueless contact point is dropped, an unknown use is none, and
+    /// marital status falls back to the first coding.
+    #[test]
+    fn from_fhir_refuses_and_drops_what_it_cannot_use() {
+        let parse = |v: serde_json::Value| serde_json::from_value::<FhirPerson>(v).expect("parses");
+        assert!(
+            from_fhir_person(&parse(serde_json::json!({ "resourceType": "Patient" }))).is_err(),
+            "no name"
+        );
+        let bad_id = parse(serde_json::json!({
+            "resourceType": "Patient", "id": "not-a-uuid", "name": [{ "family": "Jones" }]
+        }));
+        assert!(from_fhir_person(&bad_id).is_err(), "a bad id");
+
+        let fhir = parse(serde_json::json!({
+            "resourceType": "Patient",
+            "name": [{ "family": "Jones", "given": ["Ann"] }, { "family": "Evans" }],
+            "telecom": [
+                { "system": "carrier-pigeon", "value": "x" },
+                { "system": "phone" },
+                { "system": "email", "value": "a@b.test", "use": "sometimes" }
+            ],
+            "maritalStatus": { "coding": [{ "code": "S" }] }
+        }));
+        let person = from_fhir_person(&fhir).expect("converts");
+        assert_eq!(person.telecom.len(), 1, "{:?}", person.telecom);
+        assert_eq!(person.telecom[0].value, "a@b.test");
+        assert!(person.telecom[0].use_type.is_none());
+        assert_eq!(person.marital_status.as_deref(), Some("S"));
+        assert_eq!(
+            person.additional_names.len(),
+            1,
+            "a second name is an alias"
+        );
+    }
+}
