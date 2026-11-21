@@ -716,4 +716,91 @@ mod tests {
             crate::models::IdentifierType::Other
         );
     }
+
+    /// Contact points of every system and use, addresses, marital status
+    /// and identifiers all survive the trip to FHIR and back.
+    #[test]
+    fn round_trip_carries_contacts_addresses_and_status() {
+        use crate::models::{
+            Address, ContactPoint, ContactPointSystem as S, ContactPointUse as U, Identifier,
+            IdentifierType,
+        };
+        let mut worker = sample_worker();
+        let systems = [
+            S::Phone,
+            S::Fax,
+            S::Email,
+            S::Pager,
+            S::Url,
+            S::Sms,
+            S::Other,
+        ];
+        let uses = [
+            Some(U::Home),
+            Some(U::Work),
+            Some(U::Temp),
+            Some(U::Old),
+            Some(U::Mobile),
+            None,
+            Some(U::Home),
+        ];
+        worker.telecom = systems
+            .iter()
+            .zip(uses)
+            .enumerate()
+            .map(|(i, (system, use_type))| ContactPoint {
+                system: *system,
+                value: format!("v{i}"),
+                use_type,
+            })
+            .collect();
+        worker.addresses = vec![Address {
+            use_type: None,
+            line1: Some("1 Hall Road".into()),
+            line2: Some("Floor 2".into()),
+            city: Some("Cardiff".into()),
+            state: Some("Glamorgan".into()),
+            postal_code: Some("CF10 1AA".into()),
+            country: Some("GB".into()),
+        }];
+        worker.marital_status = Some("married".into());
+        worker.identifiers = vec![Identifier::new(
+            IdentifierType::SSN,
+            "urn:ssn".into(),
+            "123".into(),
+        )];
+
+        let back = from_fhir_worker(&to_fhir_worker(&worker)).expect("round trip");
+        assert_eq!(
+            serde_json::to_value(&back.telecom).unwrap(),
+            serde_json::to_value(&worker.telecom).unwrap()
+        );
+        assert_eq!(back.addresses[0].line2.as_deref(), Some("Floor 2"));
+        assert_eq!(back.addresses[0].postal_code.as_deref(), Some("CF10 1AA"));
+        assert_eq!(back.marital_status.as_deref(), Some("married"));
+        assert_eq!(back.identifiers[0].value, "123");
+    }
+
+    /// From FHIR: a contact point with an unknown system or no value is
+    /// dropped; an unknown use is no use; marital status falls back to the
+    /// first coding when there is no text.
+    #[test]
+    fn from_fhir_drops_unusable_contacts_and_reads_status_codings() {
+        let fhir: FhirWorker = serde_json::from_value(serde_json::json!({
+            "resourceType": "Practitioner",
+            "name": [{ "family": "Jones", "given": ["Ann"] }],
+            "telecom": [
+                { "system": "carrier-pigeon", "value": "x" },
+                { "system": "phone" },
+                { "system": "email", "value": "a@b.test", "use": "sometimes" }
+            ],
+            "maritalStatus": { "coding": [{ "code": "S" }] }
+        }))
+        .expect("parses");
+        let worker = from_fhir_worker(&fhir).expect("converts");
+        assert_eq!(worker.telecom.len(), 1, "{:?}", worker.telecom);
+        assert_eq!(worker.telecom[0].value, "a@b.test");
+        assert!(worker.telecom[0].use_type.is_none());
+        assert_eq!(worker.marital_status.as_deref(), Some("S"));
+    }
 }

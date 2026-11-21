@@ -8,6 +8,16 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ## [Unreleased]
 
+### Added — relay drain and FHIR conversion tests
+
+- `tests/relay_drain.rs`, ported from person: a failing sink publishes
+  nothing, a working one stamps `published_at` without resending, and the
+  retention purge removes published rows (the relay was 43% covered).
+- FHIR conversion unit tests: contact points of every system and use,
+  addresses, marital status and identifiers round-trip; an unknown or
+  valueless contact point is dropped and an unknown use is none; marital
+  status falls back to the first coding (the module was 76% covered).
+
 ### Added — the bulk links pull is tested as a privileged read
 
 - `tests/bulk_links_enforced.rs`: with enforcement on and the default
