@@ -8,6 +8,7 @@
 mod bed_requests;
 mod boards;
 mod flows;
+mod infection_flags;
 mod persistence;
 mod topology;
 mod transfers;

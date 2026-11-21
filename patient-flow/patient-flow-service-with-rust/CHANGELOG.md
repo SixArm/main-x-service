@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — infection-flag and audit tests
+
+- `tests/requests/infection_flags.rs`: an open transmissible flag refuses a
+  transfer to an ordinary bed, and once cleared the move succeeds; a flag
+  clears once and only through its own stay; the clear is in the flag's
+  audit trail and the ward-scoped handover query.
+
 ### Added — demand board and cancellation tests
 
 - `tests/requests/bed_requests.rs`: open requests list emergency, urgent,
