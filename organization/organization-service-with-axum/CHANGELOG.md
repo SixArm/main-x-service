@@ -9,6 +9,16 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — ABAC policy hot-reload test
+
+- `tests/policy_reload.rs`, the family's first test of policy hot-reload:
+  an edited `ORGANIZATION_ABAC_POLICY_FILE` takes effect on
+  `reload_policy()` and through the file watcher (a paused clock advanced
+  past its poll interval), and a malformed edit falls back to the default
+  policy (read allowed, write denied) rather than leaving no policy. The
+  watcher step fails if the watcher is not spawned. Adds tokio's
+  `test-util` to the dev dependencies.
+
 ### Added — audit-integrity verification and relay drain tests
 
 - `compliance::audit_integrity` unit tests for `verify`: intact rows

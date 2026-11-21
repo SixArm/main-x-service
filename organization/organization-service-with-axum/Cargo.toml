@@ -139,6 +139,8 @@ tokio = { version = "1.54", default-features = false, features = [
   # `time` lets the boot-reindex test await a spawned background task
   # instead of busy-waiting.
   "time",
+  # `test-util` gives the policy-watcher test a paused, advanceable clock.
+  "test-util",
 ] }
 
 # An in-process OTLP/gRPC collector for `tests/otlp_export.rs`: the
