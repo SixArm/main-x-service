@@ -6,6 +6,7 @@ mod bulk;
 mod cases;
 mod entity_links;
 mod event_outbox;
+mod fhir;
 mod review_queue;
 mod review_queue_paging;
 

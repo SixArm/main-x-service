@@ -20,6 +20,16 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   - a missing file, an unknown masking profile and an unknown format are
     `400`; a dry run writes nothing; a repeated `Idempotency-Key` is the
     same job; unknown and wrong-kind job ids are `404`.
+- `tests/requests/fhir.rs`: the `CapabilityStatement`; a `Task` create →
+  read → search → update → delete → `404 not-found`; a non-JSON body is
+  `400 structure` on create and update, a `Task` with no description `400
+  invalid`, and an unknown id `404` on read, update and delete. The FHIR
+  controller was 61% covered.
+- `audit_checkpoint_is_honoured_and_alterations_are_named`: a fresh
+  checkpoint is honoured; altered copies get `rows_deleted`,
+  `head_changed` and `anchor_missing` without the shared chain being
+  touched; a checkpoint MAC this service cannot read is
+  `checkpoint_unverifiable`.
 - `tests/relay_drain.rs`: a failing sink publishes nothing, a working one
   stamps `published_at` without resending, and the retention purge removes
   published rows; no broker needed.

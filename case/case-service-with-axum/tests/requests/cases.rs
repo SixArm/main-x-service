@@ -1935,3 +1935,54 @@ async fn merge_waits_for_a_concurrent_lock_then_fails_closed() {
     })
     .await;
 }
+
+/// A fresh checkpoint is honoured; each alteration of it is named by the
+/// verdict it should get, without touching the shared chain; and a
+/// checkpoint whose MAC this service cannot read is unverifiable, which
+/// is a statement about the witness, not the chain.
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL (config/test.yaml); run with: cargo test -- --ignored"]
+async fn audit_checkpoint_is_honoured_and_alterations_are_named() {
+    super::isolate_search_index();
+    request::<App, _, _>(|request, _ctx| async move {
+        let created = request
+            .post("/api/cases")
+            .json(&json!({ "title": "Checkpoint anchor case" }))
+            .await;
+        assert!(created.status_code().is_success(), "{}", created.text());
+
+        let checkpoint: Value = request.get("/api/cases/checkpoint").await.json();
+        let verify = |c: Value| {
+            let request = &request;
+            async move {
+                let r = request.post("/api/cases/checkpoint/verify").json(&c).await;
+                assert_eq!(r.status_code(), 200, "{}", r.text());
+                r.json::<Value>()
+            }
+        };
+        let report = verify(checkpoint.clone()).await;
+        assert_eq!(report["honoured"], true, "{report}");
+
+        if checkpoint["mac"].is_null() {
+            let mut c = checkpoint.clone();
+            c["rows_at_or_before"] = json!(checkpoint["rows_at_or_before"].as_u64().unwrap() + 1);
+            assert_eq!(verify(c).await["verdict"]["verdict"], "rows_deleted");
+            let mut c = checkpoint.clone();
+            c["head"] = json!("0".repeat(64));
+            assert_eq!(verify(c).await["verdict"]["verdict"], "head_changed");
+            let mut c = checkpoint.clone();
+            c["anchor_id"] = json!(i64::MAX);
+            assert_eq!(verify(c).await["verdict"]["verdict"], "anchor_missing");
+        }
+        let mut c = checkpoint.clone();
+        c["mac"] = json!("not-a-mac");
+        let report = verify(c).await;
+        assert_eq!(report["honoured"], false);
+        assert_eq!(
+            report["verdict"]["verdict"], "checkpoint_unverifiable",
+            "{report}"
+        );
+    })
+    .await;
+}
