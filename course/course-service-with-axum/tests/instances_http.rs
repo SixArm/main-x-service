@@ -149,3 +149,57 @@ async fn an_instance_is_reached_through_its_own_course_only() {
         "nor deleted twice"
     );
 }
+
+/// A deleted course's instances go with it. Listing them was already a
+/// `404`, but one instance stayed readable and writable by id.
+#[tokio::test]
+#[ignore = "requires PostgreSQL (DB_URL)"]
+async fn a_deleted_courses_instances_are_not_served() {
+    let app = common::create_test_router().await;
+    let parent = course(&app, "DeletedParent").await;
+    let (status, created) = call(
+        &app,
+        "POST",
+        &format!("/api/courses/{parent}/instances"),
+        Some(&instance(&parent, "Orphan cohort")),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED, "{created}");
+    let id = created["id"].as_str().unwrap().to_string();
+    let uri = format!("/api/courses/{parent}/instances/{id}");
+    assert_eq!(
+        call(&app, "DELETE", &format!("/api/courses/{parent}"), None)
+            .await
+            .0,
+        StatusCode::NO_CONTENT
+    );
+
+    assert_eq!(
+        call(
+            &app,
+            "GET",
+            &format!("/api/courses/{parent}/instances"),
+            None
+        )
+        .await
+        .0,
+        StatusCode::NOT_FOUND
+    );
+    assert_eq!(
+        call(&app, "GET", &uri, None).await.0,
+        StatusCode::NOT_FOUND,
+        "read"
+    );
+    assert_eq!(
+        call(&app, "PUT", &uri, Some(&instance(&parent, "Changed")))
+            .await
+            .0,
+        StatusCode::NOT_FOUND,
+        "update"
+    );
+    assert_eq!(
+        call(&app, "DELETE", &uri, None).await.0,
+        StatusCode::NOT_FOUND,
+        "delete"
+    );
+}

@@ -9,6 +9,12 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Fixed — a deleted course's instances are not served
+
+- After a course was deleted, its instance list was a `404` but a single
+  instance could still be read, updated and deleted by id under it. Those
+  three now check the parent course first, as create and list did.
+
 ### Fixed — an update does not bring a deleted record back (SEC-B13)
 
 - `PUT /api/courses/{id}` on a soft-deleted record answered `200` and the

@@ -492,6 +492,12 @@ pub async fn update_instance_handler(
     Path((course_id, instance_id)): Path<(Uuid, Uuid)>,
     Json(mut instance): Json<CourseInstance>,
 ) -> impl IntoResponse {
+    // A deleted course's instances go with it: the list already answered
+    // `404` for one, but a single instance stayed readable, writable and
+    // deletable by id under the deleted parent.
+    if let Err(e) = require_course_exists(&state, &course_id).await {
+        return e;
+    }
     instance.course_id = course_id;
     instance.id = instance_id;
     let errs = validate_instance(&instance);
@@ -533,6 +539,12 @@ pub async fn get_instance(
     State(state): State<AppState>,
     Path((course_id, instance_id)): Path<(Uuid, Uuid)>,
 ) -> impl IntoResponse {
+    // A deleted course's instances go with it: the list already answered
+    // `404` for one, but a single instance stayed readable, writable and
+    // deletable by id under the deleted parent.
+    if let Err(e) = require_course_exists(&state, &course_id).await {
+        return e;
+    }
     match state
         .course_repository
         .get_instance(&course_id, &instance_id)
@@ -561,6 +573,12 @@ pub async fn delete_instance(
     State(state): State<AppState>,
     Path((course_id, instance_id)): Path<(Uuid, Uuid)>,
 ) -> impl IntoResponse {
+    // A deleted course's instances go with it: the list already answered
+    // `404` for one, but a single instance stayed readable, writable and
+    // deletable by id under the deleted parent.
+    if let Err(e) = require_course_exists(&state, &course_id).await {
+        return e;
+    }
     let prior = state
         .course_repository
         .get_instance(&course_id, &instance_id)
