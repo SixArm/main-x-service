@@ -378,3 +378,62 @@ async fn show_unknown_volume_returns_404() {
     })
     .await;
 }
+
+/// Pins: `GET /api/volumes` lists every volume, and filters by NHS Number
+/// (in any spacing) and by a case-insensitive term over the title and the
+/// patient's name; a volume with no cabinet reads "In transit".
+#[tokio::test]
+#[serial]
+async fn list_volumes_filters_by_nhs_number_and_term() {
+    request::<App, _, _>(|request, ctx| async move {
+        super::clean_db(&ctx).await;
+        let cab = super::seed_location_chain("Cabinet L1");
+        super::seed_patient_in_main_patient_service("943 476 5919", "Alice Johnson");
+        super::seed_patient_in_main_patient_service("401 023 2137", "Bryn Evans");
+        for (nhs, title, cabinet) in [
+            (
+                "943 476 5919",
+                "Alice Johnson — Vol 1",
+                Some(cab.id.to_string()),
+            ),
+            ("401 023 2137", "Bryn Evans — Vol 1", None),
+        ] {
+            let mut body = serde_json::json!({ "nhs_number": nhs, "title": title });
+            if let Some(c) = cabinet {
+                body["cabinet_id"] = serde_json::json!(c);
+            }
+            let r = request.post("/api/volumes").json(&body).await;
+            assert_eq!(r.status_code(), 201, "{}", r.text());
+        }
+        let titles = |v: serde_json::Value| -> Vec<String> {
+            v["items"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|i| i["title"].as_str().unwrap().to_string())
+                .collect()
+        };
+
+        let all: serde_json::Value = request.get("/api/volumes").await.json();
+        assert_eq!(titles(all.clone()).len(), 2, "{all}");
+        let bryn = all["items"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|i| i["title"] == "Bryn Evans — Vol 1")
+            .unwrap();
+        assert_eq!(bryn["cabinet_label"], "In transit", "{bryn}");
+
+        let by_nhs: serde_json::Value = request
+            .get("/api/volumes?nhs_number=9434765919")
+            .await
+            .json();
+        assert_eq!(titles(by_nhs), vec!["Alice Johnson — Vol 1"]);
+        let by_title: serde_json::Value = request.get("/api/volumes?q=BRYN").await.json();
+        assert_eq!(titles(by_title.clone()), vec!["Bryn Evans — Vol 1"]);
+        assert_eq!(by_title["query"], "BRYN");
+        let none: serde_json::Value = request.get("/api/volumes?q=nobody").await.json();
+        assert!(titles(none).is_empty());
+    })
+    .await;
+}

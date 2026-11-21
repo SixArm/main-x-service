@@ -16,6 +16,16 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   place client read only `places`, so every cabinet search against the
   real service was silently empty. Both keys are accepted.
 
+### Added — volume list and folder create tests
+
+- `GET /api/volumes` lists every volume and filters by NHS Number in any
+  spacing and by a case-insensitive term over title and patient name; a
+  volume with no cabinet reads "In transit".
+- `POST /api/folders` refuses a blank title first, then names each missing
+  new-patient field (`patient_name`, `date_of_birth`); a folder joins a
+  volume only of its own patient (another patient's is `422`, an unknown
+  id is ignored).
+
 ### Found — the folder store does not match thing-service (CF-X1, open)
 
 - The thing client's fields, `PATCH` and `{"things": [...]}` envelope are

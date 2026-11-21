@@ -195,3 +195,89 @@ async fn folder_history_lists_events_for_folder() {
     })
     .await;
 }
+
+/// Pins: a folder needs a title (checked first, on its own), and
+/// registering a new patient needs a name and a date of birth, each its
+/// own `422` error.
+#[tokio::test]
+#[serial]
+async fn create_folder_names_each_missing_field() {
+    request::<App, _, _>(|request, ctx| async move {
+        super::clean_db(&ctx).await;
+        let r = request
+            .post("/api/folders")
+            .json(&serde_json::json!({ "nhs_number": "943 476 5919", "title": " " }))
+            .await;
+        assert_eq!(r.status_code(), 422, "{}", r.text());
+        assert!(r.json::<serde_json::Value>()["errors"]["title"].is_string());
+
+        let r = request
+            .post("/api/folders")
+            .json(&serde_json::json!({ "nhs_number": "943 476 5919", "title": "Volume 1" }))
+            .await;
+        assert_eq!(r.status_code(), 422, "{}", r.text());
+        let errors = &r.json::<serde_json::Value>()["errors"];
+        for field in ["patient_name", "date_of_birth"] {
+            assert!(errors[field].is_string(), "{field}: {errors}");
+        }
+    })
+    .await;
+}
+
+/// Pins: a folder joins a volume only of its own patient. The same
+/// patient's volume is attached and its title snapshotted; another
+/// patient's volume is a `422`; an unknown volume id is ignored.
+#[tokio::test]
+#[serial]
+async fn create_folder_joins_only_its_own_patients_volume() {
+    request::<App, _, _>(|request, ctx| async move {
+        super::clean_db(&ctx).await;
+        let cabinet = super::seed_location_chain("Cabinet F9");
+        super::seed_patient_in_main_patient_service("943 476 5919", "Alice Johnson");
+        super::seed_patient_in_main_patient_service("401 023 2137", "Bryn Evans");
+        let volume =
+            |nhs: &str, title: &str| serde_json::json!({ "nhs_number": nhs, "title": title });
+        let alice_vol: serde_json::Value = request
+            .post("/api/volumes")
+            .json(&volume("943 476 5919", "Alice — Vol 1"))
+            .await
+            .json();
+        let bryn_vol: serde_json::Value = request
+            .post("/api/volumes")
+            .json(&volume("401 023 2137", "Bryn — Vol 1"))
+            .await
+            .json();
+        let folder = |title: &str, vol: &serde_json::Value| {
+            serde_json::json!({
+                "nhs_number": "943 476 5919", "title": title,
+                "cabinet_id": cabinet.id.to_string(), "volume_id": vol,
+            })
+        };
+
+        let own = request
+            .post("/api/folders")
+            .json(&folder("Own", &alice_vol["id"]))
+            .await;
+        assert_eq!(own.status_code(), 201, "{}", own.text());
+        assert_eq!(
+            own.json::<serde_json::Value>()["volume_id"],
+            alice_vol["id"]
+        );
+
+        let other = request
+            .post("/api/folders")
+            .json(&folder("Other", &bryn_vol["id"]))
+            .await;
+        assert_eq!(other.status_code(), 422, "{}", other.text());
+        assert!(other.json::<serde_json::Value>()["errors"]["volume_id"].is_string());
+
+        let unknown = serde_json::json!(uuid::Uuid::new_v4().to_string());
+        let loose = request
+            .post("/api/folders")
+            .json(&folder("Loose", &unknown))
+            .await;
+        assert_eq!(loose.status_code(), 201, "{}", loose.text());
+        assert!(loose.json::<serde_json::Value>()["volume_id"].is_null());
+    })
+    .await;
+}
