@@ -9,6 +9,7 @@ mod boards;
 mod flows;
 mod persistence;
 mod topology;
+mod transfers;
 
 /// Build the demo topology one test needs: a site, one ward (kind /
 /// specialty as given), one `flexible` bay, and `beds` beds. Returns

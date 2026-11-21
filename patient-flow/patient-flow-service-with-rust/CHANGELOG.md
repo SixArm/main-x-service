@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — bed transfer tests
+
+- `tests/requests/transfers.rs`: a transfer relocates the stay, occupies
+  the new bed and vacates the old one; an unknown reason, an override with
+  no stated reason, the current bed as destination, a vacated bed awaiting
+  cleaning, and an unknown stay are refused (the transfer handler was the
+  largest uncovered path in the crate, at 84.73% overall).
+
 ### Fixed — patients and staff resolve to names, not URNs
 
 - The display-name lookup read only string `display_name` / `name` /
