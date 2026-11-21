@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — demand board and cancellation tests
+
+- `tests/requests/bed_requests.rs`: open requests list emergency, urgent,
+  routine with a live eligible-bed count; cancelling an allocated request
+  releases its reserved bed; an open request cancels too; a second cancel
+  is `422` and an unknown request `404`; cancelled requests count no
+  eligible beds.
+
 ### Added — bed transfer tests
 
 - `tests/requests/transfers.rs`: a transfer relocates the stay, occupies

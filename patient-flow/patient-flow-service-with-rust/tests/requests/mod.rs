@@ -5,6 +5,7 @@
 //! (`updated_at`, the same-day `Red2Green` upsert, the relay poll's
 //! lock) in [`persistence`].
 
+mod bed_requests;
 mod boards;
 mod flows;
 mod persistence;
