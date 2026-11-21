@@ -157,6 +157,24 @@ pub async fn get_fhir_worker(
     }
 }
 
+/// The native validation a FHIR write must pass, as `POST` / `PUT
+/// /api/workers` do (`agents/share/fhir.md` §2): each problem as one issue
+/// of a `422` `processing` outcome. Without it a FHIR write skipped the
+/// required-field and format rules and the SEC-M1 input-size caps.
+fn validation_refusal(worker: &crate::models::Worker) -> Option<Response> {
+    let errors = crate::validation::validate_worker(worker);
+    (!errors.is_empty()).then(|| {
+        let messages: Vec<String> = errors
+            .iter()
+            .map(|e| format!("{}: {}", e.field, e.message))
+            .collect();
+        fhir_json(
+            StatusCode::UNPROCESSABLE_ENTITY,
+            &FhirOperationOutcome::errors("processing", &messages),
+        )
+    })
+}
+
 /// `POST /fhir/Practitioner` — parses the FHIR body into the internal model
 /// (`400` invalid outcome on failure), assigns a UUID if absent, persists,
 /// indexes, and returns the created resource (`201`) with a `Location` header.
@@ -178,6 +196,9 @@ pub async fn create_fhir_worker(
     };
     match from_fhir_worker(&fhir_worker) {
         Ok(mut worker) => {
+            if let Some(refused) = validation_refusal(&worker) {
+                return refused;
+            }
             if worker.id == Uuid::nil() {
                 worker.id = Uuid::new_v4();
             }
@@ -277,6 +298,9 @@ pub async fn update_fhir_worker(
     }
     match from_fhir_worker(&fhir_worker) {
         Ok(mut worker) => {
+            if let Some(refused) = validation_refusal(&worker) {
+                return refused;
+            }
             worker.id = id;
             match state
                 .worker_repository

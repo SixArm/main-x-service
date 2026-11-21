@@ -8,6 +8,13 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ## [Unreleased]
 
+### Fixed — FHIR writes take the native validation
+
+- `POST` and `PUT /fhir/Practitioner` skipped `validate_worker`, which
+  `POST /api/workers` runs, so a FHIR write bypassed the required-field and
+  format rules and the SEC-M1 input-size caps. They now answer a failure
+  with a `422` `processing` `OperationOutcome`, one issue per problem.
+
 ### Fixed — FHIR writes take the record-level decision (SEC-G9)
 
 - `PUT` and `DELETE /fhir/Practitioner/{id}` went straight to the

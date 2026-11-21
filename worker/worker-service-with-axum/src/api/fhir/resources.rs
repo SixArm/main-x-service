@@ -283,6 +283,24 @@ pub struct FhirOperationOutcomeIssue {
 }
 
 impl FhirOperationOutcome {
+    /// Builds an outcome with one `error` issue per message, all `code`, as
+    /// a validation failure reports each problem (`fhir.md` §5).
+    #[must_use]
+    pub fn errors(code: &str, messages: &[String]) -> Self {
+        Self {
+            resource_type: "OperationOutcome".to_string(),
+            issue: messages
+                .iter()
+                .map(|m| FhirOperationOutcomeIssue {
+                    severity: "error".to_string(),
+                    code: code.to_string(),
+                    details: None,
+                    diagnostics: Some(m.clone()),
+                })
+                .collect(),
+        }
+    }
+
     /// Builds an `error`-severity outcome with the given issue `code` and
     /// diagnostic message.
     #[must_use]

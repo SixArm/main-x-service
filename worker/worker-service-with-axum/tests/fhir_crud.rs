@@ -129,6 +129,13 @@ async fn bad_practitioner_input_is_an_operation_outcome() {
         assert!(r.status_code().is_client_error(), "{}", r.text());
         assert_eq!(r.json::<Value>()["resourceType"], "OperationOutcome");
 
+        // The native validation applies: an over-long family name (SEC-M1
+        // caps it at 1024) is a 422 with one issue per problem.
+        let long = practitioner(&"x".repeat(5000), "Ada");
+        let r = server.post("/fhir/Practitioner").json(&long).await;
+        assert_eq!(r.status_code(), 422, "{}", r.text());
+        assert_eq!(r.json::<Value>()["issue"][0]["code"], "processing");
+
         let missing = Uuid::new_v4();
         let r = server
             .put(&format!("/fhir/Practitioner/{missing}"))

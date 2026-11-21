@@ -2608,8 +2608,9 @@
   - [ ] care-pathway — `controllers/fhir.rs` `update` / `remove`.
   - [x] case — fixed 2026-11-20; FHIR create and update also skipped
     validation (SEC-M1 caps), now applied. `tests/fhir_write_abac.rs`.
-  - [ ] **Also check** person, organization and care-pathway FHIR create
-    and update for the same missing validation.
+  - [ ] **FHIR writes skip native validation** (SEC-M1 caps included) in
+    person and organization too; worker fixed 2026-11-20, case with its
+    SEC-G9 fix; care-pathway already validates.
 - [x] **SEC-G9 (S) 🟠** Masking left emergency contacts' phone numbers
   whole. *(found and done 2026-11-09)* Person's and worker's
   `mask_person` / `mask_worker` mask the subject's phone, SMS and fax
