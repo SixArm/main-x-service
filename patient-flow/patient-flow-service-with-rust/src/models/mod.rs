@@ -142,3 +142,43 @@ pub async fn delete_all_rows(db: &sqlx::PgPool) -> Result<(), sqlx::Error> {
     sqlx::query!("DELETE FROM sites").execute(db).await?;
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{ModelError, to_i64, updated_one};
+    use std::error::Error as _;
+
+    /// Each variant displays its cause, exposes it as `source`, and maps
+    /// to its fixed axa status: missing is `NotFound`, a database error
+    /// stays one, anything else is `Any`.
+    #[test]
+    fn model_errors_display_chain_and_convert() {
+        let missing = ModelError::EntityNotFound;
+        assert_eq!(missing.to_string(), "Entity not found");
+        assert!(missing.source().is_none());
+        assert!(matches!(axa::Error::from(missing), axa::Error::NotFound));
+
+        let db: ModelError = sqlx::Error::RowNotFound.into();
+        assert!(db.source().is_some());
+        assert_eq!(db.to_string(), sqlx::Error::RowNotFound.to_string());
+        assert!(matches!(axa::Error::from(db), axa::Error::Sqlx(_)));
+
+        let other = ModelError::Any("bad pid".into());
+        assert_eq!(other.to_string(), "bad pid");
+        assert!(other.source().is_some());
+        assert!(matches!(axa::Error::from(other), axa::Error::Any(_)));
+    }
+
+    /// A `LIMIT` past `i64::MAX` saturates; an update that touched no row
+    /// is an error, not a silent success.
+    #[test]
+    fn limit_clamp_and_updated_one() {
+        assert_eq!(to_i64(25), 25);
+        assert_eq!(to_i64(u64::MAX), i64::MAX);
+        assert!(updated_one(1).is_ok());
+        assert!(matches!(
+            updated_one(0),
+            Err(ModelError::Sqlx(sqlx::Error::RowNotFound))
+        ));
+    }
+}
