@@ -8,6 +8,20 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ## [Unreleased]
 
+### Added — bulk HTTP and relay drain tests
+
+- `tests/bulk_http.rs`, the first tests of the bulk endpoints over HTTP
+  (the handlers were 20% covered with the DB suite): a JSONL import
+  completes and creates; a `full` export filtered by name carries the
+  imported person; a missing file and an unknown format or masking profile
+  are `400`; a dry run writes nothing (a later real import still creates
+  the row, and a repeat import of an existing row creates none); a
+  repeated `Idempotency-Key` is the same import or export job; the job list
+  carries the import; unknown and wrong-kind job ids are `404`.
+- `tests/relay_drain.rs`: a failing sink publishes nothing, a working one
+  stamps `published_at` without resending, and the retention purge removes
+  published rows; no broker needed.
+
 ### Fixed — a far-future `since` panicked the bulk links pull (SEC-M10)
 
 - `GET /api/persons/links?since=2999-01-01T00:00:00Z` panicked into a
