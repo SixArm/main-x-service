@@ -9,6 +9,18 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — FHIR PlanDefinition CRUD and relay drain tests
+
+- `tests/requests/fhir.rs` `fhir_plan_definition_crud_and_errors`: create
+  → read → update → delete → `404`; a non-JSON body on create and update
+  and an untitled PlanDefinition are client-error `OperationOutcome`s; a
+  5000-character title is `422` (the native validation applies on FHIR
+  writes); an unknown id is `404` on read, update and delete. The FHIR
+  controller was 57% covered with the DB suite.
+- `tests/relay_drain.rs`: a failing sink publishes nothing, a working one
+  stamps `published_at` without resending, and the retention purge removes
+  published rows; no broker needed.
+
 ### Added — screening reach and timing (entity T-15c)
 
 - `GET /api/care-pathways/{pathway}/screening?instrument=` reports, for

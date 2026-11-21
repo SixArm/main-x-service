@@ -96,3 +96,64 @@ async fn fhir_search_by_id_alone_still_works() {
     })
     .await;
 }
+
+/// A `PlanDefinition` create → read → update → delete round trip, and the
+/// `OperationOutcome` each malformed or unknown request gets. Search,
+/// `$validate`, `$export` and SMART discovery are covered elsewhere.
+#[tokio::test]
+#[serial]
+#[ignore = "requires PostgreSQL; run with: cargo test -- --ignored"]
+async fn fhir_plan_definition_crud_and_errors() {
+    super::isolate_search_index();
+    request::<App, _, _>(|request, _ctx| async move {
+        let json_of = |text: String| serde_json::from_str::<Value>(&text).unwrap();
+        let plan = |title: &str| json!({ "resourceType": "PlanDefinition", "status": "active", "title": title });
+
+        let meta = json_of(request.get("/fhir/metadata").await.text());
+        assert_eq!(meta["resourceType"], "CapabilityStatement");
+        assert!(meta.to_string().contains("PlanDefinition"));
+
+        let created = request.post("/fhir/PlanDefinition").json(&plan("Roundtrip pathway")).await;
+        assert_eq!(created.status_code(), 201, "{}", created.text());
+        let id = json_of(created.text())["id"].as_str().unwrap().to_string();
+
+        let read = request.get(&format!("/fhir/PlanDefinition/{id}")).await;
+        assert_eq!(read.status_code(), 200, "{}", read.text());
+        assert_eq!(json_of(read.text())["title"], "Roundtrip pathway");
+
+        let mut changed = plan("Renamed pathway");
+        changed["id"] = json!(id);
+        let updated = request.put(&format!("/fhir/PlanDefinition/{id}")).json(&changed).await;
+        assert_eq!(updated.status_code(), 200, "{}", updated.text());
+        assert_eq!(json_of(updated.text())["title"], "Renamed pathway");
+
+        let deleted = request.delete(&format!("/fhir/PlanDefinition/{id}")).await;
+        assert!(deleted.status_code().is_success(), "{}", deleted.text());
+        let gone = request.get(&format!("/fhir/PlanDefinition/{id}")).await;
+        assert_eq!(gone.status_code(), 404);
+        assert_eq!(json_of(gone.text())["resourceType"], "OperationOutcome");
+
+        for put in [false, true] {
+            let uri = if put { format!("/fhir/PlanDefinition/{id}") } else { "/fhir/PlanDefinition".to_string() };
+            let builder = if put { request.put(&uri) } else { request.post(&uri) };
+            let bad = builder.bytes("not json".into()).content_type("application/fhir+json").await;
+            assert_eq!(bad.status_code(), 400, "{}", bad.text());
+            assert_eq!(json_of(bad.text())["resourceType"], "OperationOutcome");
+        }
+        let untitled = request
+            .post("/fhir/PlanDefinition")
+            .json(&json!({ "resourceType": "PlanDefinition", "status": "active" }))
+            .await;
+        assert!(untitled.status_code().is_client_error(), "{}", untitled.text());
+        assert_eq!(json_of(untitled.text())["resourceType"], "OperationOutcome");
+        let long = request.post("/fhir/PlanDefinition").json(&plan(&"x".repeat(5000))).await;
+        assert_eq!(long.status_code(), 422, "the native validation applies: {}", long.text());
+
+        let missing = uuid::Uuid::new_v4();
+        assert_eq!(request.get(&format!("/fhir/PlanDefinition/{missing}")).await.status_code(), 404);
+        let r = request.put(&format!("/fhir/PlanDefinition/{missing}")).json(&plan("Nobody")).await;
+        assert_eq!(r.status_code(), 404, "{}", r.text());
+        assert_eq!(request.delete(&format!("/fhir/PlanDefinition/{missing}")).await.status_code(), 404);
+    })
+    .await;
+}
