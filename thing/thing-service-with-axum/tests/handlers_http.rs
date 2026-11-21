@@ -58,14 +58,14 @@ async fn call(
 /// A distinct letters-only name, so no two test things look alike to the
 /// create-time duplicate check.
 fn name(prefix: &str) -> String {
+    // Wholly random over 26 letters, so no two test things look alike to
+    // the create-time duplicate check, including rows earlier runs left.
     let letters: String = Uuid::new_v4()
-        .simple()
-        .to_string()
-        .chars()
-        .take(12)
-        .map(|c| char::from(b'a' + u8::try_from(c.to_digit(16).unwrap()).unwrap()))
+        .as_bytes()
+        .iter()
+        .map(|b| char::from(b'a' + b % 26))
         .collect();
-    format!("{prefix} {letters}")
+    format!("{letters} {prefix}")
 }
 
 async fn create(app: &axum::Router, prefix: &str) -> Uuid {
@@ -85,7 +85,21 @@ async fn create(app: &axum::Router, prefix: &str) -> Uuid {
 async fn merge_retires_the_duplicate_and_refuses_bad_pairs() {
     let app = app().await;
     let main = create(&app, "Mergemain").await;
-    let duplicate = create(&app, "Mergedup").await;
+    let doi = format!("10.1234/{}", Uuid::new_v4().simple());
+    let dup_name = name("Mergedup");
+    let (status, body) = call(
+        &app,
+        "POST",
+        "/api/things",
+        Some(&json!({
+            "name": dup_name,
+            "same_as": ["https://www.wikidata.org/wiki/Q42"],
+            "identifiers": [{ "property_id": "Doi", "value": doi }]
+        })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED, "{body}");
+    let duplicate: Uuid = body["id"].as_str().unwrap().parse().unwrap();
 
     let (status, merged) = call(
         &app,
@@ -95,11 +109,15 @@ async fn merge_retires_the_duplicate_and_refuses_bad_pairs() {
     )
     .await;
     assert!(status.is_success(), "{status} {merged}");
-    assert_eq!(
-        call(&app, "GET", &format!("/api/things/{main}"), None)
-            .await
-            .0,
-        StatusCode::OK
+    // The survivor carries what it took from the duplicate (spec §6.4).
+    let (status, survivor) = call(&app, "GET", &format!("/api/things/{main}"), None).await;
+    assert_eq!(status, StatusCode::OK);
+    let text = survivor.to_string();
+    assert!(text.contains(&doi), "identifier carried: {text}");
+    assert!(text.contains("Q42"), "same_as carried: {text}");
+    assert!(
+        text.contains(&dup_name),
+        "the duplicate's name is an alternate: {text}"
     );
     assert_eq!(
         call(&app, "GET", &format!("/api/things/{duplicate}"), None)

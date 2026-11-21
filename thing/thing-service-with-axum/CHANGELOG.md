@@ -8,6 +8,15 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ## [Unreleased]
 
+### Fixed — a merge carries the duplicate's data to the survivor
+
+- `POST /api/things/merge` stored the survivor unchanged, so the
+  duplicate's identifiers, `alternate_names`, `same_as` and `images`
+  survived only in the merge record's JSON snapshot. They are now carried
+  across without duplicates, and the duplicate's name becomes an alternate
+  name (spec §6.4). Test names are now wholly random, so test things no
+  longer trip the create-time duplicate check.
+
 ### Fixed — an update does not bring a deleted record back (SEC-B13)
 
 - `PUT /api/things/{id}` on a soft-deleted record answered `200` and the

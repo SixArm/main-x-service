@@ -626,6 +626,33 @@ pub async fn check_duplicates(
     )
 }
 
+/// Fold a duplicate into the survivor (spec §6.4): identifiers,
+/// `alternate_names`, `same_as` and `images` the survivor lacks are carried
+/// across, and the duplicate's name becomes an alternate name. Before this
+/// the merge stored the survivor unchanged, so the duplicate's identifiers
+/// survived only in the JSON snapshot.
+fn transfer_thing_data(main: &Thing, duplicate: &Thing) -> Thing {
+    fn union<T: Clone + PartialEq>(into: &mut Vec<T>, from: &[T]) {
+        for item in from {
+            if !into.contains(item) {
+                into.push(item.clone());
+            }
+        }
+    }
+    let mut merged = main.clone();
+    union(&mut merged.identifiers, &duplicate.identifiers);
+    union(&mut merged.alternate_names, &duplicate.alternate_names);
+    union(&mut merged.same_as, &duplicate.same_as);
+    union(&mut merged.images, &duplicate.images);
+    if duplicate.name != merged.name {
+        union(
+            &mut merged.alternate_names,
+            std::slice::from_ref(&duplicate.name),
+        );
+    }
+    merged
+}
+
 /// Merge a duplicate thing into a surviving main thing.
 #[utoipa::path(post, path = "/api/things/merge", tag = "matching",
     request_body = MergeRequest,
@@ -671,6 +698,7 @@ pub async fn merge_things(
     };
 
     let transferred = serde_json::to_value(&dup).ok();
+    let main = transfer_thing_data(&main, &dup);
     // Atomic merge: the survivor's row + the duplicate's soft-delete (and,
     // under the outbox transport, the `Merged`+`Deleted` outbox rows)
     // commit in one transaction. Merge-history, search sync, and the
