@@ -356,8 +356,12 @@ impl CourseRepository for PgCourseRepository {
     }
 
     async fn soft_delete(&self, id: &Uuid) -> Result<()> {
-        if self.find_row(*id).await?.is_none() {
-            return Err(crate::Error::NotFound);
+        // An unknown or already-deleted course is not found. Deleting a
+        // deleted one again would re-stamp `deleted_at`, losing when it was
+        // really deleted, and emit a second `deleted` event (SEC-B12).
+        match self.find_row(*id).await? {
+            Some(row) if row.active && row.deleted_at.is_none() => {}
+            _ => return Err(crate::Error::NotFound),
         }
         // Soft delete: flip `active` off and stamp `deleted_at` rather
         // than removing the row, preserving it for the audit trail.

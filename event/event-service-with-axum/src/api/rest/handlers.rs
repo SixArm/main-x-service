@@ -279,6 +279,7 @@ pub async fn update_event(
     params(("id" = Uuid, Path, description = "Event UUID")),
     responses(
         (status = 204, description = "Event deleted"),
+        (status = 404, description = "No such event, or already deleted"),
         (status = 500, description = "Internal server error")
     )
 )]
@@ -286,11 +287,14 @@ pub async fn update_event(
 ///
 /// Serves HTTP `DELETE /api/events/{id}`. Marks the event inactive
 /// (soft delete — the row is retained for the audit trail) and removes
-/// it from the search index, then returns `204 No Content`. Idempotent
-/// in spirit: deleting an already-deleted id still reports success.
+/// it from the search index, then returns `204 No Content`.
 ///
 /// # Errors
 ///
+/// - `404 Not Found` — no such event, or it is already deleted. A second
+///   delete used to answer `204` and re-stamp `deleted_at`, losing when the
+///   event was really deleted, and publish another `Deleted` event; the
+///   FHIR and gRPC deletes already answered not-found (SEC-B12).
 /// - `500 Internal Server Error` — the repository `delete` failed.
 ///
 /// A search-index removal failure is logged, not surfaced.
@@ -304,6 +308,9 @@ pub async fn delete_event(
                 tracing::warn!("Failed to delete event from search index: {}", e);
             }
             StatusCode::NO_CONTENT.into_response()
+        }
+        Err(crate::Error::EventNotFound(_)) => {
+            ApiProblem::new("not_found", "Event not found").respond(StatusCode::NOT_FOUND)
         }
         Err(e) => ApiProblem::new("database_error", format!("Failed to delete event: {e}"))
             .respond(StatusCode::INTERNAL_SERVER_ERROR),

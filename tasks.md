@@ -2836,6 +2836,22 @@
 
 ### F-input — unverified input, false matches & fuzzing (validators + matchers)
 
+- [x] **SEC-B12 (S)** A repeat delete rewrote the deletion time and
+  re-announced it. *(found and done 2026-11-21, raising place-service
+  coverage)* In place, thing and course, `soft_delete` found the row with
+  a lookup that also returns soft-deleted rows, so `DELETE` on an
+  already-deleted record answered `204`, re-stamped `deleted_at` (losing
+  when the record was really deleted, which retention and audit read) and
+  emitted a second `deleted` event to the bus and the link-graph presence
+  oracle. Event's repository did not check existence at all: `DELETE
+  /api/events/{id}` on an id that never existed answered `204` and
+  published a `Deleted` event, and the handler mapped every error to
+  `500`, though event's own FHIR and gRPC deletes already answered
+  not-found. All four now answer `404` for an unknown or already-deleted
+  record and leave `deleted_at` alone; `tests/delete_twice.rs` in each
+  checks the status and the stored timestamp, and fails without the fix.
+  Person and worker check existence in their handlers and were not
+  affected.
 - [x] **SEC-M1 (M) 🟠** Input-size caps. *(case + care-pathway + portfolio
   validators done 2026-07-13; `limit_payload` backstop + a broken-production-config
   sweep done 2026-08-02)* Per-field length + array-cardinality caps in

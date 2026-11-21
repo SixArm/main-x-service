@@ -372,6 +372,12 @@ impl ThingRepository for PgThingRepository {
     /// [`crate::Error::Database`] on any DB failure.
     async fn soft_delete(&self, id: &Uuid) -> Result<()> {
         let row = self.find_row(*id).await?.ok_or(crate::Error::NotFound)?;
+        // An already-deleted record is gone to the caller, as it is to every
+        // read. Deleting it again would re-stamp `deleted_at`, losing when it
+        // was really deleted, and emit a second `deleted` event (SEC-B12).
+        if row.is_deleted {
+            return Err(crate::Error::NotFound);
+        }
         // One transaction, so the tombstone, its re-stamped digests
         // (INT-V1) and, under the outbox transport, the `deleted` outbox
         // row commit together: a deleted row is never left carrying the

@@ -3,6 +3,7 @@
 Spec-driven work breakdown. Tick the box when an automated test or
 clearly described manual check confirms the acceptance criterion.
 
+- [x] **SEC-B12 — a repeat delete is `404`.** *(done 2026-11-21)* `DELETE /api/events/{id}` on an unknown or already-deleted record answered `204`, re-stamped `deleted_at` and emitted another `deleted` event. It is now `404` and the stored deletion time is kept. `tests/delete_twice.rs` fails without the fix. Repo `tasks.md` SEC-B12.
 - [x] **2026-09-07 — prost 0.13 → 0.14 / tonic 0.12 → 0.14 migration.**
   Dependabot `prost` and `tonic-build` bumps exposed that tonic 0.12
   cannot compile against prost 0.14 generated code. tonic 0.14 split

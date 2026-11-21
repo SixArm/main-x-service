@@ -8,6 +8,13 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ## [Unreleased]
 
+### Fixed — a repeat delete is `404` and keeps the deletion time (SEC-B12)
+
+- `DELETE /api/things/{id}` on an already-deleted record answered `204`,
+  re-stamped `deleted_at`, losing when it was really deleted, and emitted a
+  second `deleted` event. It is now `404`, and the stored deletion
+  time is left alone. `tests/delete_twice.rs`.
+
 ### Added — FHIR Device and relay drain tests
 
 - `tests/fhir_crud.rs`, the crate's first FHIR request tests (the

@@ -3,6 +3,7 @@
 Spec-driven work breakdown. Tick the box when an automated test or
 clearly described manual check confirms the acceptance criterion.
 
+- [x] **SEC-B12 — a repeat delete is `404`.** *(done 2026-11-21)* `DELETE /api/places/{id}` on an unknown or already-deleted record answered `204`, re-stamped `deleted_at` and emitted another `deleted` event. It is now `404` and the stored deletion time is kept. `tests/delete_twice.rs` fails without the fix. Repo `tasks.md` SEC-B12.
 - [x] **2026-11-07 — Cursor pagination (`axa::cursor_pagination`).**
   `GET /api/places`, `/api/places/search` and `/api/places/nearby` page
   by `?limit=` and a signed `?cursor=`, with `Link: rel="next"` while

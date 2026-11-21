@@ -8,6 +8,13 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ## [Unreleased]
 
+### Fixed — a repeat delete is `404` and keeps the deletion time (SEC-B12)
+
+- `DELETE /api/events/{id}` on an already-deleted record answered `204`,
+  re-stamped `deleted_at`, losing when it was really deleted, and emitted a
+  second `deleted` event. An id that never existed did the same, and published a `Deleted` event for it. It is now `404`, and the stored deletion
+  time is left alone. `tests/delete_twice.rs`.
+
 ### Added — FHIR Appointment and relay drain tests
 
 - `tests/fhir_crud.rs` (the FHIR controller was 30% covered with the DB

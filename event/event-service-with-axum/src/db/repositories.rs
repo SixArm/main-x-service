@@ -1598,8 +1598,15 @@ impl EventRepository for PgEventRepository {
     }
 
     async fn delete(&self, id: &Uuid) -> Result<()> {
-        // Capture the pre-image for the DELETE audit `old_values`.
-        let old = self.get_by_id(id).await?;
+        // Capture the pre-image for the DELETE audit `old_values`. An
+        // unknown or already-deleted event is not found: stamping it anyway
+        // would re-stamp `deleted_at` on a deleted row, losing when it was
+        // really deleted, and publish a `Deleted` event for an event that
+        // never existed (SEC-B12).
+        let Some(existing) = self.get_by_id(id).await? else {
+            return Err(crate::Error::EventNotFound(id.to_string()));
+        };
+        let old = Some(existing);
         // Soft delete: stamp `deleted_at`/`deleted_by` only, a partial
         // UPDATE that leaves the rest of the row untouched and the child
         // rows in place.

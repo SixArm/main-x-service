@@ -1,5 +1,6 @@
 ## 13. Tasks
 
+- [x] **SEC-B12 — a repeat delete is `404`.** *(done 2026-11-21)* `DELETE /api/courses/{id}` on an unknown or already-deleted record answered `204`, re-stamped `deleted_at` and emitted another `deleted` event. It is now `404` and the stored deletion time is kept. `tests/delete_twice.rs` fails without the fix. Repo `tasks.md` SEC-B12.
 - [x] **SEC-M1 (security): input-size caps on the `Course` payload.**
   `validate_course`/`validate_instance` now bound every scalar text field
   (`MAX_TEXT_LEN = 1024`), string-array cardinality + per-entry length

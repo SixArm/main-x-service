@@ -556,6 +556,12 @@ impl PlaceRepository for PgPlaceRepository {
 
     async fn soft_delete(&self, id: &Uuid) -> Result<()> {
         let row = self.find_row(*id).await?.ok_or(crate::Error::NotFound)?;
+        // An already-deleted record is gone to the caller, as it is to every
+        // read. Deleting it again would re-stamp `deleted_at`, losing when it
+        // was really deleted, and emit a second `deleted` event (SEC-B12).
+        if row.is_deleted {
+            return Err(crate::Error::NotFound);
+        }
         // Under the outbox transport, the tombstone update and the `deleted`
         // outbox row commit atomically in one transaction; the memory
         // transport keeps the plain, tx-free single-row update.
