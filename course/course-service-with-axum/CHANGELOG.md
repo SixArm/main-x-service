@@ -9,6 +9,21 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Fixed — an instance created with the nil id no longer blocks the next
+
+- `POST /api/courses/{id}/instances` stored a client-sent all-zeros `id`
+  verbatim: the first such instance took it, and every later one, under any
+  course, was a `500` on the primary key. It now mints a fresh id for the
+  nil sentinel, as course create already did.
+
+### Added — CourseInstance read, replace and delete over HTTP
+
+- `tests/instances_http.rs`: an instance is reached only through its own
+  course (read, update and delete under another course are `404`, and the
+  instance is unchanged); an update is stored; a bad language tag is `422`;
+  an unknown instance is `404`; a deleted instance is not served, nor
+  deleted twice. It fails without the fix above.
+
 ### Fixed — a repeat delete is `404` and keeps the deletion time (SEC-B12)
 
 - `DELETE /api/courses/{id}` on an already-deleted record answered `204`,

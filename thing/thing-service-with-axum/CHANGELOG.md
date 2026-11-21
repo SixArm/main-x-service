@@ -8,6 +8,14 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ## [Unreleased]
 
+### Added — HTTP tests for merge, delete, review decisions and 404s
+
+- `tests/handlers_http.rs`, ported from place: a merge retires the
+  duplicate, a self-merge is `422` and an unknown side `404`; the masked
+  view, export, per-thing and recent audit, and both integrity verifiers
+  answer; a review-queue decision is first-writer-wins, unknown `404`;
+  every single-thing endpoint is `404` for an unknown id.
+
 ### Fixed — a repeat delete is `404` and keeps the deletion time (SEC-B12)
 
 - `DELETE /api/things/{id}` on an already-deleted record answered `204`,

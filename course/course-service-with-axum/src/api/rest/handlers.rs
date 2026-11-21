@@ -453,6 +453,12 @@ pub async fn create_instance(
         return e;
     }
     instance.course_id = course_id;
+    // The nil UUID is the "you pick" sentinel, as for a course: stored
+    // verbatim, the first such instance took it and every later one, under
+    // any course, failed on the primary key with a `500`.
+    if instance.id == Uuid::nil() {
+        instance.id = Uuid::new_v4();
+    }
     let errs = validate_instance(&instance);
     if !errs.is_empty() {
         return validation_response(&errs);
