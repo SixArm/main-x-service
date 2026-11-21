@@ -2,6 +2,7 @@
 //! suite in [`cases`] and the durable event-bus Phase-2 outbox atomicity
 //! suite in [`event_outbox`].
 
+mod bulk;
 mod cases;
 mod entity_links;
 mod event_outbox;

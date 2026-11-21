@@ -9,6 +9,21 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Added — bulk import/export and relay drain tests
+
+- `tests/requests/bulk.rs`, the crate's first bulk request tests (bulk
+  handlers were 45% covered with the DB suite):
+  - a keyed row creates once and the identical file upserts, so re-running
+    an import never duplicates;
+  - JSONL and CSV imports come back out of export; the default (masked)
+    export carries titles but no case numbers, and `full` carries both;
+  - a missing file, an unknown masking profile and an unknown format are
+    `400`; a dry run writes nothing; a repeated `Idempotency-Key` is the
+    same job; unknown and wrong-kind job ids are `404`.
+- `tests/relay_drain.rs`: a failing sink publishes nothing, a working one
+  stamps `published_at` without resending, and the retention purge removes
+  published rows; no broker needed.
+
 ### Fixed — FHIR writes take the record-level decision and validation (SEC-G10)
 
 - `PUT` and `DELETE /fhir/Task/{id}` skipped the record-level ABAC check
