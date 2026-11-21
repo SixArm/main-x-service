@@ -8,6 +8,17 @@ versioning: [SemVer](https://semver.org/spec/v2.0.0.html). See also:
 
 ## [Unreleased]
 
+### Added — HTTP tests for the review queue, checkpoints, merge and 404s
+
+- `tests/handlers_http.rs`: the review-queue list and decision endpoints
+  (first writer wins: a second decision is `422`, an unknown id `404`);
+  the audit checkpoint is honoured, and an altered one is named
+  `rows_deleted`, `head_changed` or `anchor_missing` without touching the
+  shared chain; a merge carries the duplicate's identifiers and addresses
+  to the survivor and the duplicate stops being served; the audit listings
+  answer; every single-worker endpoint is `404` for an unknown id, except
+  erasure, which is idempotent and answers by design.
+
 ### Fixed — FHIR writes take the native validation
 
 - `POST` and `PUT /fhir/Practitioner` skipped `validate_worker`, which
