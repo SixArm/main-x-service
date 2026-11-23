@@ -603,9 +603,9 @@ dependencies = [
 
 [[package]]
 name = "aws-sdk-s3"
-version = "1.160.0"
+version = "1.161.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "061d5be27d146aaa2d27d2661f1fd2f76c33f788b82d6a6d0b2994a8e964c9fd"
+checksum = "d9c63e3ca6e56670513469e992759f4a51041603fde329471b29c5c1f5eaeefe"
 dependencies = [
  "arc-swap",
  "aws-credential-types",
@@ -925,9 +925,9 @@ dependencies = [
 
 [[package]]
 name = "axa"
-version = "0.20.0"
+version = "0.20.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "503f2f37873a0ed6adcc552126c7e79c517280e6771279d4af2376181ba02c16"
+checksum = "6eb799ae08cf3b0aafe0428beda561eaf3c99d5649f580796d201432a759c032"
 dependencies = [
  "async-trait",
  "axa-accepts-version-negotiation",
