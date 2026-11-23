@@ -42,7 +42,7 @@ rustls = { version = "0.23", default-features = false, features = ["ring", "std"
 # so `src/auth/crypto.rs` installs a minimal custom `CryptoProvider`
 # (the documented extension point) built on the `hmac`/`sha2` below —
 # see that module's docs for the full reasoning.
-jsonwebtoken = { version = "11", default-features = false }
+jsonwebtoken = { version = "12", default-features = false }
 hmac = "0.13"
 sha2 = "0.11"
 
