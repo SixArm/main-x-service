@@ -329,9 +329,9 @@ dependencies = [
 
 [[package]]
 name = "axa"
-version = "0.20.0"
+version = "0.20.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "503f2f37873a0ed6adcc552126c7e79c517280e6771279d4af2376181ba02c16"
+checksum = "6eb799ae08cf3b0aafe0428beda561eaf3c99d5649f580796d201432a759c032"
 dependencies = [
  "async-trait",
  "axa-accepts-version-negotiation",
